@@ -13,34 +13,48 @@ MACHINE_AVAILABLE_COLOR = (255,0,0)
 MACHINE_ASSIGNED_COLOR = (127,127,127)
 MACHINE_NOT_AVAILABLE_COLOR = (0,0,0)
 
-
 class Machine:
+    dict_machine_name = {}
     def __init__(self, machineName):
         self.name = machineName
 
         self.available_daywise_slots = []
         self.filled_daywise_slots = []
         self.non_working_slots = []
+        self.dict_machine_name[self.name] = self
 
     def schedule(self):
         pass
 
     def getDateAvailability(self, date):
-
         pass
 
 
 class DaySlotMachine:
-    def __init__(self, day, machine:Machine):
-        self.day = day
-        self.machine = machine
-
-        self.daySlotArray = np.zeros((24,1), dtype=np.float32)
     
+    weekSchedules = {}
+
+    def __init__(self, day, machine:Machine, weekNo):
+        self.day = day
+        self.day_string = self.day.strftime("%m-%d-%y")
+        self.machine = machine
+        self.weekNo = weekNo
+
+        self.daySlotArray = np.zeros((1,24), dtype=np.float32)
+        self.colorDaySlotArray = None
+
+        if self.weekNo not in self.weekSchedules.keys():
+            self.weekSchedules[weekNo] = {}
+        if self.day_string not in self.weekSchedules[weekNo].keys():
+            self.weekSchedules[weekNo][self.day_string] = {}
+        if self.machine.name not in self.weekSchedules[weekNo][self.day_string].keys():
+            self.weekSchedules[weekNo][self.day_string][self.machine.name] = self
+            
+
     def assignMachineHrs_filled(self, listHrsBooked:List[int]):
         """Function takes in list of hrs ex. [10,11,12,13,14] adds them to self.hrs_filled_up"""
         for hr in listHrsBooked: 
-            self.daySlotArray[hr,0] = ASSIGNED
+            self.daySlotArray[0,hr] = ASSIGNED
 
     def calculate_hrs_available(self):
         self.hrs_available = []
@@ -50,35 +64,47 @@ class DaySlotMachine:
 
     def add_non_working_hrs(self, stHr, endHr):
         for hr in range(stHr, endHr):
-            self.daySlotArray[hr,0] = NOT_AVAILABLE
+            self.daySlotArray[0,hr] = NOT_AVAILABLE
 
     def setInitialDayAvailability(self, stHr, endHr):
         for hr in range(stHr, endHr):
-            self.daySlotArray[hr,0] = AVAILABLE
+            self.daySlotArray[0,hr] = AVAILABLE
+    
+    def create_img(self):
+        oneCh = self.daySlotArray.copy()
+        self.colorDaySlotArray = cv2.merge((oneCh, oneCh, oneCh))
+        self.colorDaySlotArray = self.colorDaySlotArray.astype(np.uint8)
+        self.colorDaySlotArray[self.daySlotArray==AVAILABLE] = MACHINE_AVAILABLE_COLOR
+        self.colorDaySlotArray[self.daySlotArray==NOT_AVAILABLE] = MACHINE_NOT_AVAILABLE_COLOR
+        self.colorDaySlotArray[self.daySlotArray==ASSIGNED] = MACHINE_ASSIGNED_COLOR
+        return self.colorDaySlotArray
+
     
     def plot_img(self):
-        oneCh = self.daySlotArray.copy()
-        plotImgArray = cv2.merge((oneCh, oneCh, oneCh))
-        plotImgArray = plotImgArray.astype(np.uint8)
-        plotImgArray[self.daySlotArray==AVAILABLE] = MACHINE_AVAILABLE_COLOR
-        plotImgArray[self.daySlotArray==NOT_AVAILABLE] = MACHINE_NOT_AVAILABLE_COLOR
-        plotImgArray[self.daySlotArray==ASSIGNED] = MACHINE_ASSIGNED_COLOR
         widowName = f"daySchedule {self.machine.name} 1/1/22"
-        cv2.namedWindow(widowName,cv2.WINDOW_NORMAL)
-        cv2.imshow(widowName, plotImgArray)
+        # cv2.namedWindow(widowName,cv2.WINDOW_NORMAL)
+        # cv2.imshow(widowName, self.colorDaySlotArray)
+        # cv2.waitKey(-1)
+    @classmethod
+    def plot_week_img(self, machineSequenceNames, weekNo=1):
+        daysDict = DaySlotMachine.weekSchedules[weekNo]
+        
+        imgHt = sum([len(daysDict[machineName]) for machineName in daysDict.keys()])
+        imageColorNew = np.zeros((imgHt, 24,3)).astype(np.uint8)
+
+        rowNo = 0
+        for i, dayStr in enumerate(daysDict.keys()):
+            
+            sortedmachineScheduleList = []
+            for j, machineName in enumerate(machineSequenceNames):
+                daySlot = daysDict[dayStr][machineName]
+                imgDaySlot = daySlot.create_img()
+                imageColorNew[rowNo:rowNo+1, :] = imgDaySlot
+                rowNo+=1
+                sortedmachineScheduleList.append(daySlot)
+
+        cv2.imshow("Week no. {weekNo}", imageColorNew)
         cv2.waitKey(-1)
-
-
-
-
-class EachDaySchedule:
-    def __init__(self, date) -> None:
-        self.date = date
-        self.listDaySlotMachines = []   # list containing DaySlot of each machines
-    
-    def addDaySlotOfmachine(self, daySlotMachine: DaySlotMachine):
-        self.listDaySlotMachines.append(daySlotMachine)
-
 
 
 class Operation:
@@ -89,6 +115,8 @@ class Operation:
         self.minDelayHrs = 0
         self.maxDelayHrs = 0
         self.timeOperation = 'hrs'
+        self.totalMaxHrs = 0
+        self.totalMinHrs = 0
 
         self.npArray = None
 
@@ -100,11 +128,12 @@ class Operation:
             self.minDelayHrs = minDelayHrs
         if maxDelayHrs !="-":
             self.maxDelayHrs = maxDelayHrs
-
+        
+        self.totalMaxHrs = self.cycleTime + self.maxDelayHrs
+        self.totalMinHrs = self.cycleTime + self.minDelayHrs
 
     def create_image(self):
-        totalMaxHrs = self.cycleTime + self.maxDelayHrs
-        self.npArray = np.zeros((1,totalMaxHrs,3), np.uint8)
+        self.npArray = np.zeros((1,self.totalMaxHrs,3)).astype(np.uint8)
 
         self.npArray[:, :self.cycleTime] = OPERATION_COLOR
         self.npArray[:, self.cycleTime:] = DELAY_COLOR
@@ -114,6 +143,7 @@ class Operation:
 
 
 class Order_or_job:
+    orderList = []
     def __init__(self, id) -> None:
         self.id = id
         self.operationSeq = []
@@ -130,6 +160,8 @@ class Order_or_job:
         self.totalMinTime = 0
         self.totalMaxTime = 0
 
+        self.orderImg = None
+
     def setOperationSequences(self, operationSeqList:List[Operation]):
         self.operationSeq = operationSeqList
 
@@ -140,7 +172,7 @@ class Order_or_job:
         df_line = df_line.replace("-",0)
         step, machineRequired, prevOp, cycleTimeHrs, minDelay, maxDelay = df_line
         print("opId, step, machineRequired, prevOp, cycleTimeHrs, minDelay, maxDelay",opId, step, machineRequired, prevOp, cycleTimeHrs, minDelay, maxDelay)
-        machineObjOperation = self.__getMachineObj(machineRequired, machineObjList)
+        machineObjOperation = self.__getMachineObj(machineRequired)
         # operationId, cycleTimeHrs, minDelay, maxDelay = [f"{opId}_{step}", 4, 2, 10]
         operationId = f"{opId}_{step}"
         operation1 = Operation(operationID=operationId, machineReq=machineObjOperation)
@@ -158,41 +190,59 @@ class Order_or_job:
             self.cumulativeOpEnd += cycleTimeHrs
 
         operation1.setMinMaxDelays(minDelay, maxDelay)
+        self.totalMinTime += operation1.totalMinHrs
+        self.totalMaxTime += operation1.totalMaxHrs
 
         self.operationSeq.append(operation1)
     
-    def __getMachineObj(self, machineName, machineObjectsList):
-        for machineObj in machineObjectsList:
-            if machineObj.name == machineName:
-                return machineObj
-        
-        return None
+    def __getMachineObj(self, machineName):
+        if machineName in Machine.dict_machine_name.keys():
+            return Machine.dict_machine_name[machineName]
+        else:
+            return None
     
     def getOrderImage(self):
-
-        imageList = []
-        for operation in self.operationSeq:
-            img = operation.create_image()
-            imageList.append(img)
         
-        # wList = [img.shape[1] for img in imageList]
-        # totalSecondShape = sum(hList)
+        imageHt = len(self.operationSeq)
+        imageWd = self.totalMaxTime
+        newImage = np.zeros(shape=(imageHt, imageWd, 3))
         
-        newImage = np.hstack(imageList)
+        self.orderImg = newImage.astype(np.uint8)
+        # imageList = []
+        startX = 0
+        for i, operation in enumerate(self.operationSeq):
+            imgOp = operation.create_image()
+            self.orderImg[i:i+1, startX:startX+operation.totalMaxHrs] = imgOp
+            startX = startX+operation.totalMaxHrs
+        
+ 
         print("self.grayStartList", self.grayStartList)
         print("self.grayStartList", self.grayEndList)
         widowName = f"Operation {self.id}"
         cv2.namedWindow(widowName,cv2.WINDOW_NORMAL)
-        cv2.imshow(widowName, newImage)
+        cv2.imshow(widowName, self.orderImg)
         cv2.waitKey(-1)
+        return self.orderImg
 
         
+    def save_order(self):
+        self.orderList.append(self)    
 
 
 
-class AllDayWiseMachineSchedules:
 
-    def __init__(self) -> None:
+class ScheduleAssigner:
+    def __init__(self):
         pass
-
     
+    def assign_single_order(self, order:Order_or_job):
+        orderImg = order.getOrderImage()
+
+        hImg, wImg = orderImg.shape[:2]
+        machineSequence = [operation.machineReq.name for operation in order.operationSeq]
+        sortedWeekList = sorted(list(DaySlotMachine.weekSchedules.keys())) 
+        # for week in sortedWeekList:
+        #     DaySlotMachine.weekSchedules[week].plo
+        
+        DaySlotMachine.plot_week_img(machineSequenceNames=machineSequence, weekNo=1)
+
