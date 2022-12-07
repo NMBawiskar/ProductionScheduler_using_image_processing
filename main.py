@@ -1,4 +1,4 @@
-from required_classes.scheduler import *
+from required_classes.machine_sch import *
 from datetime import datetime
 
 # Machine	StartDate	StartTime	EndDate	EndTime

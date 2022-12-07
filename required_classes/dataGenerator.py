@@ -1,5 +1,6 @@
 import pandas as pd
-from required_classes.scheduler import *
+from required_classes.machine_sch import *
+from required_classes.prod_req import *
 from datetime import datetime
 
 
@@ -45,7 +46,7 @@ class InputDataGenerator:
 
     def createAllOrders(self):
         
-        print("self.df_prod_req",self.df_prod_req)
+        # print("self.df_prod_req",self.df_prod_req)
         list_orderNames = list(set(self.df_prod_req['OrderId'])) 
 
         self.df_prod_req = self.df_prod_req.set_index('OrderId')
@@ -67,7 +68,7 @@ class InputDataGenerator:
         self.df_machine_sch.reset_index()
         
         for index, row in self.df_machine_sch.iterrows():
-            print(row['day_st_time'], row['day_end_time'])
+            # print(row['day_st_time'], row['day_end_time'])
             if "XXX" in row['day_st_time'] or "XXX" in row['day_end_time']:
                 pass
         
@@ -83,4 +84,4 @@ class InputDataGenerator:
                     daySlotMachine = DaySlotMachine(day=day,machine=machineObj, weekNo=weekNo)
                     daySlotMachine.setInitialDayAvailability(stTime.hour, endTime.hour)
                     
-        print(DaySlotMachine.weekSchedules)
+    
