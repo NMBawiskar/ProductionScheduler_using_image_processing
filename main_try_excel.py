@@ -1,6 +1,7 @@
 import pandas as pd
 from required_classes.dataGenerator import *
 from required_classes.scheduler_new import ScheduleAssigner
+import traceback
 
 excel_path = r'input_data\Requirements_Data_edited.xlsx'
 
@@ -20,14 +21,15 @@ print(len(Order_or_job.orderList))
 inputDataObj.createAllDaySlots()
 
 
-scheduleAssigner = ScheduleAssigner()
 dayList = list(DaySlotMachine.daySchedules.keys())
-scheduleAssigner.days_list = daysList
+scheduleAssigner = ScheduleAssigner()
+ScheduleAssigner.days_list = dayList
 for orderToProcess in Order_or_job.orderList:
     try:
-        scheduleAssigner.assign_single_order(order=orderToProcess)
-        if orderToProcess.isScheduleAssigned:
-            orderToProcess.print_order_assigned_status()
+        # scheduleAssigner.assign_single_order(order=orderToProcess)
+        scheduleAssigner.assign_order_operation_wise(order = orderToProcess)
+        # if orderToProcess.isScheduleAssigned:
+        #     orderToProcess.print_order_assigned_status()
     
     except Exception as e:
-        pass
+        print(traceback.print_exc())

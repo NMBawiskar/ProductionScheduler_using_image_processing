@@ -3,6 +3,7 @@ import numpy as np
 import cv2
 from required_classes.machines_ import Machine
 from collections import OrderedDict
+import config
 AVAILABLE = 1
 NOT_AVAILABLE = 0
 ASSIGNED = 0.5
@@ -15,24 +16,24 @@ MACHINE_NOT_AVAILABLE_COLOR = (0,0,0)
 
 class DaySlotMachine:
     
-    weekSchedules = {}
+    # weekSchedules = {}
     daySchedules = OrderedDict()
 
-    def __init__(self, day, machine:Machine, weekNo):
+    def __init__(self, day, machine:Machine):
         self.day = day
         self.day_string = self.day.strftime("%m-%d-%y")
         self.machine = machine
-        self.weekNo = weekNo
+    
 
         self.daySlotArray = np.zeros((1,24), dtype=np.float32)
         self.colorDaySlotArray = None
 
-        if self.weekNo not in self.weekSchedules.keys():
-            self.weekSchedules[weekNo] = {}
-        if self.day_string not in self.weekSchedules[weekNo].keys():
-            self.weekSchedules[weekNo][self.day_string] = {}
-        if self.machine.name not in self.weekSchedules[weekNo][self.day_string].keys():
-            self.weekSchedules[weekNo][self.day_string][self.machine.name] = self
+        # if self.weekNo not in self.weekSchedules.keys():
+        #     self.weekSchedules[weekNo] = {}
+        # if self.day_string not in self.weekSchedules[weekNo].keys():
+        #     self.weekSchedules[weekNo][self.day_string] = {}
+        # if self.machine.name not in self.weekSchedules[weekNo][self.day_string].keys():
+        #     self.weekSchedules[weekNo][self.day_string][self.machine.name] = self
         
         if self.day_string not in self.daySchedules.keys():
             self.daySchedules.__setitem__(self.day_string,{})
@@ -86,9 +87,27 @@ class DaySlotMachine:
         self.img_working_hrs = self.colorDaySlotArray[:, self.dayStHr:self.dayEndHr]
         
         return self.colorDaySlotArray
-
-  
     
+    def get_gray_day_slot_img(self):
+        self.create_img()
+        self.gray_day_slot_img = np.zeros_like(self.daySlotArray)
+        self.gray_day_slot_img[self.daySlotArray==AVAILABLE] = config.DAY_MACHINE_WORKING_COLOR
+        self.gray_day_slot_img[self.daySlotArray==NOT_AVAILABLE] = config.DAY_MACHINE_NON_WORKING_COLOR
+        self.gray_day_slot_img[self.daySlotArray==ASSIGNED] = config.DAY_MACHINE_ASSIGNED_COLOR
+
+        self.mask_operation_overlap_allowable = np.zeros_like(self.daySlotArray)
+        self.mask_operation_overlap_allowable[self.daySlotArray==AVAILABLE] = 255
+
+        self.mask_delay_overlap_allowable = np.zeros_like(self.daySlotArray)
+        self.mask_delay_overlap_allowable[self.daySlotArray==AVAILABLE] = 255
+        self.mask_delay_overlap_allowable[self.daySlotArray==NOT_AVAILABLE] = 255
+
+
+        return self.gray_day_slot_img, self.mask_operation_overlap_allowable, self.mask_delay_overlap_allowable
+
+
+
+
     def get_available_hrs_assigned_hrs_count(self):
         if self.img_working_hrs is None:
             self.get_day_working_img()
@@ -112,32 +131,9 @@ class DaySlotMachine:
 
         return self.availableHrs
 
-
-
     def plot_img(self):
         widowName = f"daySchedule {self.machine.name} 1/1/22"
         
-    @classmethod
-    def plot_week_img(self, machineSequenceNames, weekNo=1):
-        daysDict = DaySlotMachine.weekSchedules[weekNo]
-        
-        imgHt = sum([len(daysDict[machineName]) for machineName in daysDict.keys()])
-        self.colorImg = np.zeros((imgHt, 24,3)).astype(np.uint8)
-
-        rowNo = 0
-        for i, dayStr in enumerate(daysDict.keys()):
-            
-            sortedmachineScheduleList = []
-            for j, machineName in enumerate(machineSequenceNames):
-                daySlot = daysDict[dayStr][machineName]
-                imgDaySlot = daySlot.create_img()
-                self.colorImg[rowNo:rowNo+1, :] = imgDaySlot
-                rowNo+=1
-        
-                sortedmachineScheduleList.append(daySlot)
-
-        
-        return self.colorImg
 
     def get_day_working_img(self):
         if self.img_working_hrs is None:

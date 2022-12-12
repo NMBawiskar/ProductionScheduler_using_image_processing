@@ -2,6 +2,7 @@ from required_classes.machines_ import Machine
 from typing import List
 import numpy as np
 import cv2
+import config
 
 DELAY_COLOR = (50,50,50)
 OPERATION_COLOR = (10,255,20)
@@ -19,6 +20,7 @@ class Operation:
         self.totalMinHrs = 0
 
         self.npArray = None
+        self.grayImg = None
 
         self.operationStart_date = None
         self.operationStart_time = None
@@ -29,7 +31,7 @@ class Operation:
         # return f"opId {self.id}, step, machineRequired, prevOp, cycleTimeHrs, minDelay, maxDelay , step, machineRequired, prevOp, cycleTimeHrs, minDelay, maxDelay)
    
     def setCycleTime(self, cycleTimeInHrs):
-        self.cycleTime = cycleTimeInHrs
+        self.cycleTimeHrs = cycleTimeInHrs
 
     def setMinMaxDelays(self, minDelayHrs, maxDelayHrs):
         if minDelayHrs != "-":
@@ -37,19 +39,44 @@ class Operation:
         if maxDelayHrs !="-":
             self.maxDelayHrs = maxDelayHrs
         
-        self.totalMaxHrs = self.cycleTime + self.maxDelayHrs
-        self.totalMinHrs = self.cycleTime + self.minDelayHrs
+        self.totalMaxHrs = self.cycleTimeHrs + self.maxDelayHrs
+        self.totalMinHrs = self.cycleTimeHrs + self.minDelayHrs
 
     def create_image(self):
         singleCh = np.zeros((1,self.totalMaxHrs),dtype=np.float32)
         self.npArray = cv2.merge((singleCh,singleCh,singleCh))
         self.npArray = self.npArray.astype(np.uint8)
-        self.npArray[:, :self.cycleTime] = OPERATION_COLOR
-        self.npArray[:, self.cycleTime:] = DELAY_COLOR
+        self.npArray[:, :self.cycleTimeHrs] = OPERATION_COLOR
+        self.npArray[:, self.cycleTimeHrs:] = DELAY_COLOR
 
 
         return self.npArray
     
+    def get_working_delay_img_list(self):
+
+        imageListWithMinMaxDelay = []
+        mask_working_delay_images_list = []
+
+        for delayHr in range(self.minDelayHrs, self.maxDelayHrs+1):
+                
+            grayImg = np.zeros((1, self.cycleTimeHrs + delayHr, 1), dtype='uint8')
+            mask_operation_working = np.zeros_like(grayImg)
+            mask_operation_delay = np.zeros_like(grayImg)
+
+            grayImg[:, :self.cycleTimeHrs] = config.OPERATION_COLOR
+            mask_operation_working[:, :self.cycleTimeHrs] = 255
+
+            grayImg[:, self.cycleTimeHrs:] = config.DELAY_COLOR
+            mask_operation_delay[:, self.cycleTimeHrs:] = 255
+            imageListWithMinMaxDelay.append(grayImg)
+            mask_working_delay_images_list.append([mask_operation_working, mask_operation_delay])
+        
+
+        return imageListWithMinMaxDelay, mask_working_delay_images_list
+
+
+
+
     def print_operation_schedule(self):
         print(f"""Operation ID {self.id} : Machine {self.machineReq.name} START {self.operationStart_date} 
         - {self.operationStart_time} hrs, END {self.operationEnd_date} - {self.operationEnd_time} hrs
@@ -187,12 +214,11 @@ class Order_or_job:
                     operation.print_operation_schedule()
                 
 
-
     def check_operations_infeasibility_by_delay_hrs(self):
         for operation in self.operationSeq:
             if operation.minDelayHrs > 8:
                 self.isInfeasibleForProduction=True
                 break
-
-
+    
+    
 

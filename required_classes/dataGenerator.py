@@ -70,18 +70,22 @@ class InputDataGenerator:
         for index, row in self.df_machine_sch.iterrows():
             # print(row['day_st_time'], row['day_end_time'])
             if "XXX" in row['day_st_time'] or "XXX" in row['day_end_time']:
-                pass
+                stTime = None
+                endTime = None
+                day = datetime.strptime(row['StartDate'],"%Y-%m-%d")
         
             else:
                 
                 stTime = datetime.strptime(row['day_st_time'] ,"%Y-%m-%d__%H:%M:%S")
                 endTime =datetime.strptime(row['day_end_time'],"%Y-%m-%d__%H:%M:%S")
-                weekNo = stTime.isocalendar()[1]
+                # weekNo = stTime.isocalendar()[1]
                 
                 day = stTime.date()
-                machineObj = self.__getMachineObj(row['Machine'])
-                if machineObj is not None:
-                    daySlotMachine = DaySlotMachine(day=day,machine=machineObj, weekNo=weekNo)
+
+            machineObj = self.__getMachineObj(row['Machine'])
+            if machineObj is not None:
+                daySlotMachine = DaySlotMachine(day=day,machine=machineObj)
+                if stTime is not None:
                     daySlotMachine.setInitialDayAvailability(stTime.hour, endTime.hour)
                     
     
