@@ -4,9 +4,9 @@ import cv2
 from required_classes.machines_ import Machine
 from collections import OrderedDict
 import config
-AVAILABLE = 1
+AVAILABLE = 255
 NOT_AVAILABLE = 0
-ASSIGNED = 0.5
+ASSIGNED = 127
 
 
 MACHINE_AVAILABLE_COLOR = (255,0,0)
@@ -25,16 +25,10 @@ class DaySlotMachine:
         self.machine = machine
     
 
-        self.daySlotArray = np.zeros((1,24), dtype=np.float32)
+        self.daySlotArray = np.zeros((1,24), dtype='uint8')
         self.colorDaySlotArray = None
 
-        # if self.weekNo not in self.weekSchedules.keys():
-        #     self.weekSchedules[weekNo] = {}
-        # if self.day_string not in self.weekSchedules[weekNo].keys():
-        #     self.weekSchedules[weekNo][self.day_string] = {}
-        # if self.machine.name not in self.weekSchedules[weekNo][self.day_string].keys():
-        #     self.weekSchedules[weekNo][self.day_string][self.machine.name] = self
-        
+       
         if self.day_string not in self.daySchedules.keys():
             self.daySchedules.__setitem__(self.day_string,{})
         if self.machine.name not in self.daySchedules[self.day_string].keys():
@@ -55,10 +49,16 @@ class DaySlotMachine:
         self.hourList_available = []
         self.hourList_assigned = []
 
+        self.gray_day_slot_img = None
+        self.mask_operation_overlap_allowable = None
+        self.mask_delay_overlap_allowable = None
+        self.mask_assigned_hrs = None
+
     def assignMachineHrs_filled(self, listHrsBooked:List[int]):
         """Function takes in list of hrs ex. [10,11,12,13,14] adds them to self.hrs_filled_up"""
         for hr in listHrsBooked: 
             self.daySlotArray[0,hr] = ASSIGNED
+        self.get_gray_day_slot_img()
 
     def calculate_hrs_available(self):
         self.hrs_available = []
@@ -69,13 +69,17 @@ class DaySlotMachine:
     def add_non_working_hrs(self, stHr, endHr):
         for hr in range(stHr, endHr):
             self.daySlotArray[0,hr] = NOT_AVAILABLE
+        self.get_gray_day_slot_img()
 
     def setInitialDayAvailability(self, stHr, endHr):
         self.dayStHr = stHr
         self.dayEndHr = endHr
         self.stHrForAssigning = stHr
-        for hr in range(stHr, endHr):
-            self.daySlotArray[0,hr] = AVAILABLE
+        self.daySlotArray[:,:stHr] = NOT_AVAILABLE
+        self.daySlotArray[:,stHr:endHr] = AVAILABLE
+        self.daySlotArray[:,endHr:] = NOT_AVAILABLE
+        
+        self.get_gray_day_slot_img()
     
     def create_img(self):
         oneCh = self.daySlotArray.copy()
@@ -102,8 +106,10 @@ class DaySlotMachine:
         self.mask_delay_overlap_allowable[self.daySlotArray==AVAILABLE] = 255
         self.mask_delay_overlap_allowable[self.daySlotArray==NOT_AVAILABLE] = 255
 
+        self.mask_assigned_hrs = np.zeros_like(self.daySlotArray)
+        self.mask_assigned_hrs[self.daySlotArray==ASSIGNED] = 255
 
-        return self.gray_day_slot_img, self.mask_operation_overlap_allowable, self.mask_delay_overlap_allowable
+        return self.gray_day_slot_img, self.mask_operation_overlap_allowable, self.mask_delay_overlap_allowable, self.mask_assigned_hrs
 
 
 

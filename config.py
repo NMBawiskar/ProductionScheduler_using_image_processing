@@ -14,3 +14,14 @@ DAY_MACHINE_ASSIGNED_COLOR = 127
 ## ORDER / JOB COLORS
 DELAY_COLOR = 30
 OPERATION_COLOR = 200
+
+
+#### OPERATIONS DEFINED
+# 1. Take first operation of order     
+# 2. BREAK_OPRATION_AT_WORK_HR_FOR_NEXT_DAY
+# 3. Or assign work hr for operation1
+# 4. TRY_EXTENDING_DELAY_TO_CONSUME_NON_WORKING_HOURS_OF_NIGHT if Yes OK. if not STEP_NEXT_HR_INCREMENT
+#       For loop min to max delay hr so that next operation working should overlap  color on color  
+
+# 
+# STEP_NEXT_HR_INCREMENT

@@ -3,6 +3,8 @@ from typing import List
 import numpy as np
 import cv2
 import config
+# from utils import plot_3_images, get_day_machine_sch_img, 
+import utils
 
 DELAY_COLOR = (50,50,50)
 OPERATION_COLOR = (10,255,20)
@@ -27,9 +29,14 @@ class Operation:
         self.operationEnd_date = None
         self.operationEnd_time = None
 
-    # def __str__(self):
-        # return f"opId {self.id}, step, machineRequired, prevOp, cycleTimeHrs, minDelay, maxDelay , step, machineRequired, prevOp, cycleTimeHrs, minDelay, maxDelay)
-   
+        self.temp_assigned_st_day_index = None
+        self.temp_assigned_st_hr_index = None
+        self.temp_assigned_end_day_index = None
+        self.temp_assigned_end_hr_index = None
+        
+        self.isValidationFailed = False
+
+        
     def setCycleTime(self, cycleTimeInHrs):
         self.cycleTimeHrs = cycleTimeInHrs
 
@@ -53,13 +60,13 @@ class Operation:
         return self.npArray
     
     def get_working_delay_img_list(self):
-
+        """function return imageslist with min to max each hour image"""
         imageListWithMinMaxDelay = []
         mask_working_delay_images_list = []
 
         for delayHr in range(self.minDelayHrs, self.maxDelayHrs+1):
                 
-            grayImg = np.zeros((1, self.cycleTimeHrs + delayHr, 1), dtype='uint8')
+            grayImg = np.zeros((1, self.cycleTimeHrs + delayHr), dtype='uint8')
             mask_operation_working = np.zeros_like(grayImg)
             mask_operation_delay = np.zeros_like(grayImg)
 
@@ -76,11 +83,332 @@ class Operation:
 
 
 
-
     def print_operation_schedule(self):
         print(f"""Operation ID {self.id} : Machine {self.machineReq.name} START {self.operationStart_date} 
         - {self.operationStart_time} hrs, END {self.operationEnd_date} - {self.operationEnd_time} hrs
         """)
+    
+    def print_operation_temporary_assigned_details(self):
+        print(f"""Operation ID {self.id} : Machine {self.machineReq.name} START {self.temp_assigned_end_day_index} 
+        - {self.operationStart_time} hrs, END {self.operationEnd_date} - {self.operationEnd_time} hrs
+        """)
+
+    def try_assigning_op_cycle(self, dayStartIndex, trialStHr, isFirstOrder):
+        """USE THIS FOR FIRST OPERATION ONLY ...."""
+        """will assing temporary start day and hr and 
+        return endCycleDay, endCycleHr for DelayAssignment"""
+        endCycleDayIndex, endCycleHrIndex = None,None
+        self.temp_assigned_st_day_index = dayStartIndex
+        self.temp_assigned_st_hr_index = trialStHr
+
+
+        cycleAssigner = CycleAssignerValidator(self.cycleTimeHrs, trialStDayIndex=dayStartIndex, trialStHr=trialStHr, machineName=self.machineReq.name)
+        print("trying to set operation -->")
+        self.print_operation_schedule()
+        isAssigned = cycleAssigner.try_assigning_first_operation(isFirstOrder=isFirstOrder)
+        if isAssigned==True:
+            self.temp_assigned_st_day_index = cycleAssigner.list_day_wise_assigned_details[0][0]
+            self.temp_assigned_st_hr_index = cycleAssigner.list_day_wise_assigned_details[0][1]
+
+
+        if cycleAssigner.assigned_with_validation==True:
+            endCycleDayIndex = cycleAssigner.list_day_wise_assigned_details[-1][0] 
+            endCycleHrIndex = cycleAssigner.list_day_wise_assigned_details[-1][2]
+             
+
+        return endCycleDayIndex, endCycleHrIndex
+
+    # def assign_op_cycle_next_operation(self, dayStartIndex, indexStHr):
+
+    #     """will assing temporary start day and hr and 
+    #     return endCycleDay, endCycleHr for DelayAssignment"""
+    #     endCycleDayIndex, endCycleHrIndex = None,None
+    #     self.temp_assigned_st_day_index = dayStartIndex
+    #     self.temp_assigned_st_hr_index = indexStHr
+
+
+    #     cycleAssigner = CycleAssignerValidator(self.cycleTimeHrs, trialStDayIndex=dayStartIndex, trialStHr=indexStHr, machineName=self.machineReq.name)
+    #     print("trying to set operation -->")
+    #     self.print_operation_schedule()
+
+    def try_assigning_op_delay(self, endCycleDayIndex, endCycleHrIndex):
+        """will assing temporary end day and hr if, i) validates rule of assignment else return None None 
+        return endCycleDay, endCycleHr for DelayAssignment"""
+
+        stDelayDayIndex = endCycleDayIndex
+        stDelayHrIndex = endCycleHrIndex
+        ## get current day _end_cycle_hr
+
+        endDelayDayIndex = None
+        endDelayHrIndex = None
+
+        ## get next day_possible_start_working_hr
+        ## calculate hrs between them
+        ## if hrs between them is within min max range and 
+        ## min hr is on color ---> OK
+        ## max hr is on gray --- NOT OK          
+        ### check if stmin delay
+
+        min_delay_possible = stDelayHrIndex + self.minDelayHrs
+        daySchObj_curr = utils.get_day_machine_sch_img(dayIndex=stDelayDayIndex, machineName=self.machineReq.name)
+        mask_delay_overlap_allowable = daySchObj_curr.mask_delay_overlap_allowable
+        mask_cycle_op_allowable = daySchObj_curr.mask_operation_overlap_allowable
+
+        hrs_assignable_delay = np.sum(mask_delay_overlap_allowable==255)
+        mask_delay_overlap_allowable[:,:stDelayHrIndex] = 0
+
+        assigned_delay_hrs = 0
+        #### get end_day_index for min_delay
+        endDayIndexMinDelay = stDelayDayIndex
+        endHrIndexMinDelay = min_delay_possible
+
+        if min_delay_possible < hrs_assignable_delay:
+            ## can be assigned on the same day
+            endDayIndexMinDelay = stDelayDayIndex  ## same day
+            assigned_delay_hrs = self.minDelayHrs
+
+        else:
+            ### loop through and find end_min_delay_day_index
+            assigned_delay_hrs = hrs_assignable_delay
+            remaining_delay_hrs = self.minDelayHrs - assigned_delay_hrs
+            current_day_index = stDelayDayIndex
+            nextDaySchObj = utils.get_day_machine_sch_img(dayIndex=current_day_index+1, machineName=self.machineReq.name)
+            mask_next_day_delay_overlap_allowable = nextDaySchObj.mask_delay_overlap_allowable
+            hrs_assignable_delay_next_day = np.sum(mask_next_day_delay_overlap_allowable==255)
+            
+            while True:
+                if remaining_delay_hrs < hrs_assignable_delay_next_day:
+                    endDayIndexMinDelay = current_day_index+1
+                    endHrIndexMinDelay = remaining_delay_hrs
+                    break
+
+                else:
+                    current_day_index+=1
+                    remaining_delay_hrs -= hrs_assignable_delay_next_day
+                    nextDaySchObj = utils.get_day_machine_sch_img(dayIndex=current_day_index+1, machineName=self.machineReq.name)
+                    mask_next_day_delay_overlap_allowable = nextDaySchObj.mask_delay_overlap_allowable
+                    hrs_assignable_delay_next_day = np.sum(mask_next_day_delay_overlap_allowable==255)
+
+                
+        ####### Min delay is assigned 
+        ###### Check if min delay work means, nextOpStart is on color
+
+        nextOpStartHr = endHrIndexMinDelay  ## check if +1
+        color_next_opStart = mask_cycle_op_allowable[0,nextOpStartHr]
+        print("Next Operation start color ", color_next_opStart)
+        if color_next_opStart==255:
+            ## OK Assignable
+            endDelayDayIndex= endDayIndexMinDelay
+            endDelayHrIndex = min_delay_possible
+            self.isValidationFailed = False
+            return endDelayDayIndex, endDelayHrIndex
+        else:
+            ## if diff in max and min delay i.e. can be stretched..
+            diff_delay_hrs = self.maxDelayHrs - self.minDelayHrs 
+            if diff_delay_hrs > 0:
+                ### get next_working_hour
+                lastDayMinDelayObj =  utils.get_day_machine_sch_img(dayIndex=endDayIndexMinDelay, machineName=self.machineReq.name)
+                lastDayMinDelayObj_working_mask = lastDayMinDelayObj.mask_operation_overlap_allowable  
+                lastDayMinDelayObj_working_mask[:, :endHrIndexMinDelay] = 0  #check this line commented
+
+                hrs_stretch_possible = 0
+                countWhites, st_end_list = utils.check_if_it_has_more_than_1_white_blocks(lastDayMinDelayObj_working_mask)
+                if countWhites==1:
+                    ### same day next working hr available for stretching
+                    nextWorkingStIndex = st_end_list[0][0]
+                    # hrs_stretch_possible = nextWorkingStIndex - endDelayHrIndex
+                    hrs_stretch_possible = nextWorkingStIndex
+                    endDelayDayIndex = endDayIndexMinDelay
+                    endDelayHrIndex = nextWorkingStIndex
+                    
+
+                elif countWhites==0:
+                    ### next day next working hr available for stretching
+                    next_daySchObj = utils.get_day_machine_sch_img(dayIndex=endDayIndexMinDelay + 1, machineName=self.machineReq.name)
+                    nextDayMinDelayObj_working_mask = next_daySchObj.mask_operation_overlap_allowable  
+                    utils.plot_list_images([nextDayMinDelayObj_working_mask],["nextDayMinDelayObj_working_mask"])
+                    countWhites, st_end_list = utils.check_if_it_has_more_than_1_white_blocks(nextDayMinDelayObj_working_mask)
+                    nextWorkingStIndex = st_end_list[0][0]
+                    prev_day_stretch_possible = lastDayMinDelayObj_working_mask.shape[1] - endHrIndexMinDelay - 1
+                    curr_day_stretch_possible = nextWorkingStIndex + 1
+                    hrs_stretch_possible = prev_day_stretch_possible + curr_day_stretch_possible
+                    endDelayDayIndex = endDayIndexMinDelay + 1
+                    endDelayHrIndex = nextWorkingStIndex
+
+                if hrs_stretch_possible <=diff_delay_hrs:
+                    ## possible
+                    # add_difference_stretch
+                    self.isValidationFailed = False
+                    return endDelayDayIndex, endDelayHrIndex
+                else:
+                    self.isValidationFailed = True
+                    return None, None
+
+
+
+
+            else:
+                ## Not assignable
+                self.isValidationFailed = True
+                return None, None
+
+
+    def set_operation_temp_st_end(self, st_dayIndex, stHrIndex, end_dayIndex, endHrIndex):
+
+        self.temp_assigned_st_day_index = st_dayIndex
+        self.temp_assigned_st_hr_index = stHrIndex
+        self.temp_assigned_end_day_index = end_dayIndex
+        self.temp_assigned_end_hr_index = endHrIndex
+
+
+        
+        
+
+
+
+
+
+
+class CycleAssignerValidator:
+    def __init__(self, cycleTimeHrs, trialStDayIndex, trialStHr, machineName):
+        self.cycleTimeHrs = cycleTimeHrs
+        self.trialStDayIndex = trialStDayIndex
+        self.trialStHr = trialStHr
+        self.remaining_cycle_hrs_to_assign = self.cycleTimeHrs
+        self.machineName = machineName
+
+        self.list_crops_assigned = []
+        self.list_day_wise_assigned_details = [] ## This include list of [st_day_index, st_hr_index, size_of_crop]
+        self.list_mask_assigned_hrs = []
+
+        self.increment = 1
+        
+        self.assigned_with_validation = False
+
+    def try_assigning_first_operation(self, isFirstOrder=False):
+        """For First operation only"""
+        current_day_st_index = self.trialStDayIndex
+        current_hr_st_index = self.trialStHr
+        firstInstance = True
+        while self.remaining_cycle_hrs_to_assign >0:
+            mask_cycle = np.ones((1, self.remaining_cycle_hrs_to_assign), dtype='uint8')
+
+            daySchObj = utils.get_day_machine_sch_img(dayIndex=current_day_st_index, machineName=self.machineName)
+
+            dayGrayImg, mask_allowable_work = daySchObj.gray_day_slot_img, daySchObj.mask_operation_overlap_allowable
+            if mask_allowable_work is not None and firstInstance==True:
+                mask_allowable_work[:, :current_hr_st_index] = 0
+                firstInstance = False
+            
+            mask_assigned_hrs = daySchObj.mask_assigned_hrs
+
+            ## check_if mask_allowable_work has two working_slots
+            count_white_blocks, st_end_white_blk_list = utils.check_if_it_has_more_than_1_white_blocks(mask_allowable_work)
+            if count_white_blocks==1:
+                ## blackout the time before start_hr
+                st_possible_assing_hr = st_end_white_blk_list[0][0]
+                current_hr_st_index = st_possible_assing_hr
+                mask_allowable_work[:, :current_hr_st_index] = 0
+                ## calculate remaining time for assignment
+                hrs_allowable_for_assign = np.sum(mask_allowable_work==255)
+                print("Hrs available for assigning work", hrs_allowable_for_assign)
+                if hrs_allowable_for_assign < self.remaining_cycle_hrs_to_assign:
+                    ## cropping needed
+                    crop_curr_day = mask_cycle[:,:hrs_allowable_for_assign]
+                    self.list_crops_assigned.append(crop_curr_day)
+                    self.list_day_wise_assigned_details.append([current_day_st_index, current_hr_st_index, current_hr_st_index+hrs_allowable_for_assign])
+                    self.list_mask_assigned_hrs.append(mask_assigned_hrs)
+
+                    
+                    remaining_hrs = self.remaining_cycle_hrs_to_assign - hrs_allowable_for_assign
+                    crop_next_day = mask_cycle[:, hrs_allowable_for_assign:]
+                    assigned_crop_img = np.zeros_like(mask_allowable_work)
+                    assigned_crop_img[:,current_hr_st_index:current_hr_st_index+hrs_allowable_for_assign] = 255
+                    # utils.plot_3_images(assigned_crop_img, mask_assigned_hrs, crop_next_day)
+                    utils.plot_list_images([assigned_crop_img, mask_assigned_hrs, crop_next_day],["assigned_crop_img", "mask_assigned_hrs", "crop_next_day"] )
+                    self.remaining_cycle_hrs_to_assign = remaining_hrs
+                    current_day_st_index+=1
+                
+                else:
+                    # st, end =current_hr_st_index, current_hr_st_index+ self.remaining_cycle_hrs_to_assign
+                    crop_curr_day = mask_cycle[:,:self.remaining_cycle_hrs_to_assign]
+                    self.list_crops_assigned.append(mask_cycle)
+                    self.list_day_wise_assigned_details.append([current_day_st_index, current_hr_st_index, current_hr_st_index+self.remaining_cycle_hrs_to_assign])
+                    self.list_mask_assigned_hrs.append(mask_assigned_hrs)
+                    assigned_crop_img = np.zeros_like(mask_allowable_work)
+                    assigned_crop_img[:,current_hr_st_index:current_hr_st_index+self.remaining_cycle_hrs_to_assign] = 255
+
+                    self.remaining_cycle_hrs_to_assign = 0                    
+                    # utils.plot_3_images(crop_curr_day, mask_assigned_hrs, dayGrayImg)
+                    utils.plot_list_images([assigned_crop_img, mask_assigned_hrs, dayGrayImg],["assigned_crop_img", "mask_assigned_hrs", "dayGrayImg"] )
+
+            else:
+                current_day_st_index+=1
+
+        validation_result = self.validate_cycle_assignment_rules()
+        if validation_result==True:
+            self.assigned_with_validation = True
+            return True
+        else:
+            ### Cannot be assigned
+            ## Retry assigning with + 1 hour
+            if isFirstOrder==True:
+                self.trialStHr+= self.increment
+                self.try_assigning()
+            else:
+                return False
+
+
+
+
+    def validate_cycle_assignment_rules(self):
+        """
+        Two rules to validate : 
+        1. cycle should not overlap gray if it does, crop cycle for next day assignment
+        2. withing two crop regions there should not be any assigned day (other order assignment)
+        """
+        # check_if_all_days_are_consecutive
+        
+        result = True
+        result_order_assigned_in_between = self.check_if_other_order_assigned_in_between()
+        if result_order_assigned_in_between ==True:
+            ### Cannot be assigned
+            ## Retry assigning with + 1 hour
+            
+            result = False    
+        
+        return result
+
+
+
+    def check_if_other_order_assigned_in_between(self):
+        """"""
+        
+        result = False  
+        
+        for i in range(len(self.list_day_wise_assigned_details)):
+            if i >0:
+                ## get prev day endhr_cycle to dayEnd
+                dayIndex_prev, stHr_prev, endHr_prev = self.list_day_wise_assigned_details[i-1]
+                prev_day_assigned_already = self.list_mask_assigned_hrs[i-1][:, endHr_prev:]
+
+                dayIndex_cur, stHr_cur, endHr_cur = self.list_day_wise_assigned_details[i]
+                curr_day_assigned_already = self.list_mask_assigned_hrs[i][:, stHr_cur:] 
+                ## join and check both 
+
+                total_mask_assigned_between_ = np.hstack((prev_day_assigned_already, curr_day_assigned_already))
+                count_white_blocks, st_end_list = utils.check_if_it_has_more_than_1_white_blocks(total_mask_assigned_between_)
+                if count_white_blocks==0:
+                    ## Means no any other order assigned between 
+                    pass
+                else:
+                    ## Means there present order between the
+                    result=True
+                    break
+
+        return result
+
+
 
 
 
