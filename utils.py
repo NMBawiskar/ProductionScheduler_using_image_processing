@@ -77,8 +77,9 @@ def get_day_machine_sch_img(dayIndex, machineName):
 def plot_list_images(list_images, list_titles):
     fig = plt.figure(figsize=(10,24))
     for i in range(len(list_images)):
-        plt.subplot(len(list_images),1,i+1)
-        plt.imshow(list_images[i])
+        sub =plt.subplot(len(list_images),1,i+1)
+        sub.imshow(list_images[i])
+        sub.set_xticks(np.arange(0, 24, 24))
         plt.title(list_titles[i])
-        
+        # ax = plt.axis()
     plt.show()

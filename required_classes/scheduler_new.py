@@ -165,8 +165,19 @@ class ScheduleAssigner:
 
 
     def assign_order_operation_wise(self, order):
-        ###
+        """Main starter function to try assign all operation of an order"""
         
+        result_all_operation_assigned = self.try_assigning_all_operations(order)
+        if result_all_operation_assigned == True:
+            for operation in order.operationSeq:
+                print(f"operation {operation.id} list_details {operation.day_st_end_assigned_list}")
+            # order.freeze_order()
+        else:
+            ## Mark order as not assignable
+            pass
+
+      
+    def try_assigning_all_operations(self, order, trial_start_hr=0, trial_start_day_index=0):
 
         ### 1. Get first/next operation, its machine name, start day and start hour 
         ### 2. get corresponding machine daySlot
@@ -175,14 +186,15 @@ class ScheduleAssigner:
         ### Repeat the process above
         
         n_operations = len(order.operationSeq)
-
+        first_operation_assigned_successfully = True
+        remaining_all_operation_assignable = True
         ### 1. Get firstoperation, set its temp start day and start hour 
         first_operation_index = 0
         first_operation = order.operationSeq[first_operation_index]
         
         
-        trial_start_hr = 0
-        trial_start_day_index = 0
+        # trial_start_hr = 0
+        # trial_start_day_index = 0
         endCycleDayIndex, endCycleHrIndex = first_operation.try_assigning_op_cycle(trial_start_day_index, trial_start_hr, isFirstOrder=True)
         if endCycleDayIndex is not None:
             ## if delay hrs in operation
@@ -193,8 +205,8 @@ class ScheduleAssigner:
                 if endDelayDayIndex is None:
                     #### Operation not assignable 
                     ### Increment and restart the process 
-                    first_operation.temp_assigned_end_hr_index += self.increment
-             
+                    # first_operation.temp_assigned_end_hr_index += self.increment
+                    first_operation_assigned_successfully = False
 
 
             else:
@@ -202,78 +214,101 @@ class ScheduleAssigner:
                 endDelayDayIndex, endDelayHrIndex = endCycleDayIndex, endCycleHrIndex
                 first_operation.temp_assigned_end_day_index, first_operation.temp_assigned_end_hr_index = endDelayDayIndex, endDelayHrIndex
 
+        if first_operation_assigned_successfully ==True:
 
-        print("FIRST operation temporary assignment details :")
-        print(f"""Operation ID {first_operation.id} : Machine {first_operation.machineReq.name} 
-        START {ScheduleAssigner.days_list[first_operation.temp_assigned_st_day_index]} 
-        - {first_operation.temp_assigned_st_hr_index} hrs, END {ScheduleAssigner.days_list[first_operation.temp_assigned_end_day_index]} 
-        - {first_operation.temp_assigned_end_hr_index} hrs
-        """)
+            print("FIRST operation temporary assignment details :")
+            print(f"""Operation ID {first_operation.id} : Machine {first_operation.machineReq.name} 
+            START {ScheduleAssigner.days_list[first_operation.temp_assigned_st_day_index]} 
+            - {first_operation.temp_assigned_st_hr_index} hrs, END {ScheduleAssigner.days_list[first_operation.temp_assigned_end_day_index]} 
+            - {first_operation.temp_assigned_end_hr_index} hrs
+            """)
         #### once done first operation
         # next_operations are directly assigned and checked for validations
+        if first_operation_assigned_successfully==False:
+            ## restart the operation
+            if first_operation.temp_assigned_st_day_index is not None:
 
-        prev_op_end_day_index = first_operation.temp_assigned_end_day_index
-        prev_op_end_hr_index = first_operation.temp_assigned_end_hr_index
+                print(f"PREVIOUS trial of start day {first_operation.temp_assigned_st_day_index} and hr {first_operation.temp_assigned_st_hr_index} not feasible")
+                next_trial =  first_operation.temp_assigned_st_hr_index + 1
+                print(f"TRYING NEXT trial for start day {first_operation.temp_assigned_st_day_index} and hr {next_trial} ")
 
-        for i in range(1,n_operations):
-            print("Trying to set next operation")
-            next_operation = order.operationSeq[i]
-            print(next_operation)
-            endCycleDayIndex, endCycleHrIndex = next_operation.try_assigning_op_cycle(prev_op_end_day_index, prev_op_end_hr_index, isFirstOrder=False)
+                self.try_assigning_all_operations(order, trial_start_day_index= first_operation.temp_assigned_st_day_index, trial_start_hr=next_trial )
 
-            if endCycleDayIndex is not None:
-                ## if delay hrs in operation
-                if next_operation.maxDelayHrs>0:
-                    ### try assigning delay hrs
-                    endDelayDayIndex, endDelayHrIndex = next_operation.try_assigning_op_delay(endCycleDayIndex, endCycleHrIndex)
-                    next_operation.temp_assigned_end_day_index, next_operation.temp_assigned_end_hr_index = endDelayDayIndex, endDelayHrIndex
-                    # if endDelayDayIndex is None:
-                    #     #### Operation not assignable 
-                    #     ### Increment and restart the process 
-                    #     next_operation.temp_assigned_end_hr_index += self.increment
-
-                else:
-                    ### no min max delay
-                    endDelayDayIndex, endDelayHrIndex = endCycleDayIndex, endCycleHrIndex
-                    next_operation.temp_assigned_end_day_index, next_operation.temp_assigned_end_hr_index = endDelayDayIndex, endDelayHrIndex
-
-                print("FIRST operation temporary assignment details :")
-                print(f"""Operation ID {next_operation.id} : Machine {next_operation.machineReq.name} 
-                START {ScheduleAssigner.days_list[next_operation.temp_assigned_st_day_index]} 
-                - {next_operation.temp_assigned_st_hr_index} hrs, END {ScheduleAssigner.days_list[next_operation.temp_assigned_end_day_index]} 
-                - {next_operation.temp_assigned_end_hr_index} hrs
-                """)
-                prev_op_end_day_index = endDelayDayIndex
-                prev_op_end_hr_index = endDelayHrIndex
+        else:
+            ### Try assigning next operations    
 
 
-      
+            prev_op_end_day_index = first_operation.temp_assigned_end_day_index
+            prev_op_end_hr_index = first_operation.temp_assigned_end_hr_index
+
+            for i in range(1,n_operations):
+                print("Trying to set next operation")
+                next_operation = order.operationSeq[i]
+                print(next_operation)
+                endCycleDayIndex, endCycleHrIndex = next_operation.try_assigning_op_cycle(prev_op_end_day_index, prev_op_end_hr_index, isFirstOrder=False)
+
+                if endCycleDayIndex is not None:
+                    ## if delay hrs in operation
+                    if next_operation.maxDelayHrs>0:
+                        ### try assigning delay hrs
+                        endDelayDayIndex, endDelayHrIndex = next_operation.try_assigning_op_delay(endCycleDayIndex, endCycleHrIndex)
+                        next_operation.temp_assigned_end_day_index, next_operation.temp_assigned_end_hr_index = endDelayDayIndex, endDelayHrIndex
+                        if endDelayDayIndex is None:
+                            #### Operation not assignable 
+                            ### Increment and restart the process 
+                            # next_operation.temp_assigned_end_hr_index += self.increment
+                            # restart complete operation using
+                            remaining_all_operation_assignable = False
+                            break
+                        else:
+                            #assignable 
+                            # extend delay st end details list
+                            
+                            next_operation.day_st_end_assigned_list.extend(next_operation.delay_detail_list)
 
 
+                    else:
+                        ### no min max delay
+                        endDelayDayIndex, endDelayHrIndex = endCycleDayIndex, endCycleHrIndex
+                        next_operation.temp_assigned_end_day_index, next_operation.temp_assigned_end_hr_index = endDelayDayIndex, endDelayHrIndex
+
+                    print("FIRST operation temporary assignment details :")
+                    print(f"""Operation ID {next_operation.id} : Machine {next_operation.machineReq.name} 
+                    START {ScheduleAssigner.days_list[next_operation.temp_assigned_st_day_index]} 
+                    - {next_operation.temp_assigned_st_hr_index} hrs, END {ScheduleAssigner.days_list[next_operation.temp_assigned_end_day_index]} 
+                    - {next_operation.temp_assigned_end_hr_index} hrs
+                    """)
+                    prev_op_end_day_index = endDelayDayIndex
+                    prev_op_end_hr_index = endDelayHrIndex
+
+
+            print("All operations assignable :: ", remaining_all_operation_assignable)
+            if remaining_all_operation_assignable==True:
+                for i, operation in enumerate(order.operationSeq):
+                    operation.freeze_operation_st_end_times()
+                    print(operation)
+
+
+
+                pass
+            else:
+                ## restart the operation
+                if first_operation.temp_assigned_st_day_index is not None:
+
+                    print(f"PREVIOUS trial of start day {first_operation.temp_assigned_st_day_index} and hr {first_operation.temp_assigned_st_hr_index} not feasible")
+                    next_trial =  first_operation.temp_assigned_st_hr_index + 1
+                    print(f"TRYING NEXT trial for start day {first_operation.temp_assigned_st_day_index} and hr {next_trial} ")
+
+                    self.try_assigning_all_operations(order, trial_start_day_index= first_operation.temp_assigned_st_day_index, trial_start_hr=next_trial )
+
+
+        return remaining_all_operation_assignable
 
     @classmethod
     def get_day_machine_sch_img(self, dayIndex, machineName):
         day = ScheduleAssigner.days_list[dayIndex]
         return DaySlotMachine.daySchedules[day][machineName]
 
-
-
-    def get_next_day_image_for_order(self):
-        """For each order if required, get next day schedule image and join to the current scheduler image"""
-        pass
-
-
-    def check_if_delay_hrs_to_resize(self):
-        """Check if process is breaking at gray over gray..."""
-        pass
-    
-
-    def break_operation_and_move_remaining_for_next_day(self):
-        """"""
-        pass
-
-    def try_next_increment(self):
-        pass
 
   
 class AssignerSingleOperation:
@@ -463,10 +498,6 @@ class AssignerSingleOperation:
 
 
         return isOverlapPerfect, cropEndHr
-
-
-
-
 
 
 

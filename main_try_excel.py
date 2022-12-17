@@ -1,6 +1,8 @@
 import pandas as pd
-from required_classes.dataGenerator import *
+from required_classes.dataGenerator import InputDataGenerator
 from required_classes.scheduler_new import ScheduleAssigner
+from required_classes.prod_req import *
+from required_classes.machine_sch import *
 import traceback
 
 excel_path = r'input_data\Requirements_Data_edited.xlsx'

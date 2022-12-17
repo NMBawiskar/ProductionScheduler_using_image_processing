@@ -4,6 +4,7 @@ import cv2
 from required_classes.machines_ import Machine
 from collections import OrderedDict
 import config
+
 AVAILABLE = 255
 NOT_AVAILABLE = 0
 ASSIGNED = 127
@@ -80,6 +81,12 @@ class DaySlotMachine:
         self.daySlotArray[:,endHr:] = NOT_AVAILABLE
         
         self.get_gray_day_slot_img()
+
+    def assign_weekend_day(self):
+        self.daySlotArray[:,:] = NOT_AVAILABLE
+        self.get_gray_day_slot_img()
+
+
     
     def create_img(self):
         oneCh = self.daySlotArray.copy()
@@ -110,9 +117,6 @@ class DaySlotMachine:
         self.mask_assigned_hrs[self.daySlotArray==ASSIGNED] = 255
 
         return self.gray_day_slot_img, self.mask_operation_overlap_allowable, self.mask_delay_overlap_allowable, self.mask_assigned_hrs
-
-
-
 
     def get_available_hrs_assigned_hrs_count(self):
         if self.img_working_hrs is None:
@@ -174,3 +178,6 @@ class DaySlotMachine:
             hr_list_crop = [relativeHrList]
 
         return hr_list_crop
+
+    def assignMachineHrs_from(self, fromStartIndex):
+        self.daySlotArray[:, :]

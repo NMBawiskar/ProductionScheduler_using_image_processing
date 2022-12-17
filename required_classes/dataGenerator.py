@@ -1,6 +1,6 @@
 import pandas as pd
 from required_classes.machine_sch import *
-from required_classes.prod_req import *
+from required_classes.prod_req import Order_or_job
 from datetime import datetime
 
 
@@ -87,5 +87,6 @@ class InputDataGenerator:
                 daySlotMachine = DaySlotMachine(day=day,machine=machineObj)
                 if stTime is not None:
                     daySlotMachine.setInitialDayAvailability(stTime.hour, endTime.hour)
-                    
+                else:
+                    daySlotMachine.assign_weekend_day()
     
