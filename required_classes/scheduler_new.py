@@ -1,11 +1,11 @@
 from required_classes.prod_req import *
-from required_classes.machine_sch import *
-
-# from utils import showImg
+from required_classes.machine_sch import DaySlotMachine
+from matplotlib import pyplot as plt 
 import cv2
 import numpy as np
-import config
-# from utils import get_operation_work_and_delay_masks, showImg
+import csv
+import utils2
+
 
 GRAY_GRAY = 50
 BLACK_GRAY = 0
@@ -19,6 +19,7 @@ BLACK_PLUS_BLUE_GRAY = 29
 
 class ScheduleAssigner:
     days_list = []
+
     def __init__(self):
         self.current_weekImg = None
         self.current_weekNo = 0
@@ -30,152 +31,191 @@ class ScheduleAssigner:
         self.hWeek, self.wWeek = None, None
         self.hOrder, self.wOrder = None, None
         self.increment = 1
+        self.output_file = 'output.csv'
 
-        # self.days_list = []
-
-    def assign_single_order(self, order):
+    # def assign_single_order(self, order):
         
-        self.totalOrderImg = order.getTotalOrderImage()
-        self.currentOrderObj = order
-        machineSeq = [operation.machineReq.name for operation in order.operationSeq]
-        n_machines = len(machineSeq)
-        print('machineSeq',machineSeq)
-        # showImg("totalOrderImg",self.totalOrderImg)
+    #     self.totalOrderImg = order.getTotalOrderImage()
+    #     self.currentOrderObj = order
+    #     machineSeq = [operation.machineReq.name for operation in order.operationSeq]
+    #     n_machines = len(machineSeq)
+    #     print('machineSeq',machineSeq)
+    #     # showImg("totalOrderImg",self.totalOrderImg)
 
 
        
-        allOpearationHrs = self.totalOrderImg.shape[1]
-        opStartDateIndex = 0        
-        totalDaysReq = int(allOpearationHrs / 8)+3
-        daysScheduleImgList = [] 
-        for day in ScheduleAssigner.days_list[opStartDateIndex:opStartDateIndex+totalDaysReq]:
-            daySchedule = DaySlotMachine.daySchedules[day]
-            machineDayImages = []
-            for machine in machineSeq:
-                if machine in daySchedule.keys():
-                    dayScheduleReq = daySchedule[machine]
-                    daySchImg = dayScheduleReq.get_day_working_img()
+    #     allOpearationHrs = self.totalOrderImg.shape[1]
+    #     opStartDateIndex = 0        
+    #     totalDaysReq = int(allOpearationHrs / 8)+3
+    #     daysScheduleImgList = [] 
+    #     for day in ScheduleAssigner.days_list[opStartDateIndex:opStartDateIndex+totalDaysReq]:
+    #         daySchedule = DaySlotMachine.daySchedules[day]
+    #         machineDayImages = []
+    #         for machine in machineSeq:
+    #             if machine in daySchedule.keys():
+    #                 dayScheduleReq = daySchedule[machine]
+    #                 daySchImg = dayScheduleReq.get_day_working_img()
                     
-                    machineDayImages.append(daySchImg)
-                    # print("daySchImg.shape",daySchImg.shape)
-            imgSingleDay = np.zeros((len(machineSeq), 8,3))
-            # print("len(machineDayImages)",len(machineDayImages))
-            for i, machineDayImg in enumerate(machineDayImages):                
-                imgSingleDay[i:i+1, :] = machineDayImg
-                # showImg('imgSingleDay',imgSingleDay)
-                # cv2.waitKey(-1)
+    #                 machineDayImages.append(daySchImg)
+    #                 # print("daySchImg.shape",daySchImg.shape)
+    #         imgSingleDay = np.zeros((len(machineSeq), 8,3))
+    #         # print("len(machineDayImages)",len(machineDayImages))
+    #         for i, machineDayImg in enumerate(machineDayImages):                
+    #             imgSingleDay[i:i+1, :] = machineDayImg
+    #             # showImg('imgSingleDay',imgSingleDay)
+    #             # cv2.waitKey(-1)
             
-            daysScheduleImgList.append(imgSingleDay)
-            # print("totalSingleDayImg.shape",imgSingleDay.shape)
+    #         daysScheduleImgList.append(imgSingleDay)
+    #         # print("totalSingleDayImg.shape",imgSingleDay.shape)
     
-        totaldayImage = np.hstack(tuple(daysScheduleImgList))
-        showImg("totaldayImage",totaldayImage)
-        # print("totaldayImage.shape",totaldayImage.shape)
-        # print("self.totalOrderImg.shape",self.totalOrderImg.shape)
+    #     totaldayImage = np.hstack(tuple(daysScheduleImgList))
+    #     # showImg("totaldayImage",totaldayImage)
+    #     # print("totaldayImage.shape",totaldayImage.shape)
+    #     # print("self.totalOrderImg.shape",self.totalOrderImg.shape)
 
-        gray_order_img = cv2.cvtColor(self.totalOrderImg.astype(np.uint8), cv2.COLOR_BGR2GRAY)
-        gray_day_img = cv2.cvtColor(totaldayImage.astype(np.uint8), cv2.COLOR_BGR2GRAY)
-        # gray_order_img = cv2.cvtColor(self.totalOrderImg, cv2.COLOR_BGR2GRAY)
+    #     gray_order_img = cv2.cvtColor(self.totalOrderImg.astype(np.uint8), cv2.COLOR_BGR2GRAY)
+    #     gray_day_img = cv2.cvtColor(totaldayImage.astype(np.uint8), cv2.COLOR_BGR2GRAY)
+    #     # gray_order_img = cv2.cvtColor(self.totalOrderImg, cv2.COLOR_BGR2GRAY)
 
-        # print("np.unique(gray_order_img)",np.unique(gray_order_img))
-        # print("np.unique(gray_day_img)",np.unique(gray_day_img))
+    #     # print("np.unique(gray_order_img)",np.unique(gray_order_img))
+    #     # print("np.unique(gray_day_img)",np.unique(gray_day_img))
 
-        added = totaldayImage.copy()
-        stHr = 0
-        isOrderAssignable = False
-        machineWiseImgAssigned = []
-        while isOrderAssignable==False:
-            added[:,stHr:stHr+allOpearationHrs] = added[:,stHr:stHr+allOpearationHrs]+self.totalOrderImg
-            gray_added = gray_day_img.copy()
-            gray_added[:,stHr:stHr+allOpearationHrs] = gray_added[:,stHr:stHr+allOpearationHrs]+gray_order_img
+    #     added = totaldayImage.copy()
+    #     stHr = 0
+    #     isOrderAssignable = False
+    #     machineWiseImgAssigned = []
+    #     while isOrderAssignable==False:
+    #         added[:,stHr:stHr+allOpearationHrs] = added[:,stHr:stHr+allOpearationHrs]+self.totalOrderImg
+    #         gray_added = gray_day_img.copy()
+    #         gray_added[:,stHr:stHr+allOpearationHrs] = gray_added[:,stHr:stHr+allOpearationHrs]+gray_order_img
 
-            # print("np.unique(gray_added)",np.unique(gray_added))
-            # showImg("convolutioned",added)
-            # showImg("gray_added",gray_added)
-            # showImg("gray_order_img",gray_order_img)
-            # showImg("gray_day_img",gray_day_img)
+    #         # print("np.unique(gray_added)",np.unique(gray_added))
+    #         # showImg("convolutioned",added)
+    #         # showImg("gray_added",gray_added)
+    #         # showImg("gray_order_img",gray_order_img)
+    #         # showImg("gray_day_img",gray_day_img)
             
-            stacked_gray_added = self.break_days_combined_image(gray_added)
+    #         stacked_gray_added = self.break_days_combined_image(gray_added)
             
             
 
 
-            stacked_st_days = stacked_gray_added[:, 0]
-            stacked_end_days = stacked_gray_added[:, -1]
-            # print("stacked_st_days",stacked_st_days)
-            # print("stacked_end_days",stacked_end_days)
+    #         stacked_st_days = stacked_gray_added[:, 0]
+    #         stacked_end_days = stacked_gray_added[:, -1]
+    #         # print("stacked_st_days",stacked_st_days)
+    #         # print("stacked_end_days",stacked_end_days)
             
-            if GRAY_PLUS_BLUE_GRAY not in stacked_st_days and  GRAY_PLUS_BLUE_GRAY not in stacked_end_days:
-                isOrderAssignable = True
-                for i, machine in enumerate(machineSeq):
-                    machine_img_all_days = gray_added[i:i+1, :]
-                    stacked_gray_machine = self.break_days_combined_image(machine_img_all_days)
-                    machineWiseImgAssigned.append(stacked_gray_machine)
+    #         if GRAY_PLUS_BLUE_GRAY not in stacked_st_days and  GRAY_PLUS_BLUE_GRAY not in stacked_end_days:
+    #             isOrderAssignable = True
+    #             for i, machine in enumerate(machineSeq):
+    #                 machine_img_all_days = gray_added[i:i+1, :]
+    #                 stacked_gray_machine = self.break_days_combined_image(machine_img_all_days)
+    #                 machineWiseImgAssigned.append(stacked_gray_machine)
                     
-                break
-            stHr+=1
+    #             break
+    #         stHr+=1
 
 
 
 
-            cv2.waitKey(-1)
+    #         cv2.waitKey(-1)
 
-        if isOrderAssignable==True:
-            assigned_values_list = [] # list of operation with values stDate, stHr, endDate, endHr
+    #     if isOrderAssignable==True:
+    #         assigned_values_list = [] # list of operation with values stDate, stHr, endDate, endHr
 
-            for i, machineWiseImg in enumerate(machineWiseImgAssigned):
-                showImg(f'machine {machineSeq[i]}',machineWiseImg)
+    #         for i, machineWiseImg in enumerate(machineWiseImgAssigned):
+    #             showImg(f'machine {machineSeq[i]}',machineWiseImg)
 
-                points = np.argwhere(machineWiseImg>BLACK_PLUS_BLUE_GRAY)
-                # print(f"machine {machineSeq[i]}", points)
-                minRow = np.min(points, axis=0)[0]
-                maxRow = np.max(points, axis=0)[0]
-                minRowValues =  points[points[:,0]==minRow]
-                maxRowValues = points[points[:,0]==maxRow]
-                stHrIndex = np.min(minRowValues,axis=0)[1]
-                endHrIndex = np.max(maxRowValues, axis=0)[1]
+    #             points = np.argwhere(machineWiseImg>BLACK_PLUS_BLUE_GRAY)
+    #             # print(f"machine {machineSeq[i]}", points)
+    #             minRow = np.min(points, axis=0)[0]
+    #             maxRow = np.max(points, axis=0)[0]
+    #             minRowValues =  points[points[:,0]==minRow]
+    #             maxRowValues = points[points[:,0]==maxRow]
+    #             stHrIndex = np.min(minRowValues,axis=0)[1]
+    #             endHrIndex = np.max(maxRowValues, axis=0)[1]
                 
-                stDate, endDate = ScheduleAssigner.cycleTimeHrs[opStartDateIndex+minRow], ScheduleAssigner.cycleTimeHrs[opStartDateIndex+maxRow]
-                stHr, endHr = 8 + stHrIndex, 8 + endHrIndex
-                # print(f"minRow {minRow} stHr {stHrIndex} maxRow {maxRow} endHrIndex {endHrIndex}")
-                print(f"stDate {stDate} stHr {stHr}  endDate {endDate} endHr {endHr}")
-                assigningList = [stDate, stHr, endDate, endHr]
-                assigned_values_list.append(assigningList)
-                # print("minRowValues",minRowValues)
+    #             stDate, endDate = ScheduleAssigner.cycleTimeHrs[opStartDateIndex+minRow], ScheduleAssigner.cycleTimeHrs[opStartDateIndex+maxRow]
+    #             stHr, endHr = 8 + stHrIndex, 8 + endHrIndex
+    #             # print(f"minRow {minRow} stHr {stHrIndex} maxRow {maxRow} endHrIndex {endHrIndex}")
+    #             print(f"stDate {stDate} stHr {stHr}  endDate {endDate} endHr {endHr}")
+    #             assigningList = [stDate, stHr, endDate, endHr]
+    #             assigned_values_list.append(assigningList)
+    #             # print("minRowValues",minRowValues)
                 
-            order.assign_order(assigned_values_list)
-            cv2.waitKey(-1)    
-            
+    #         order.assign_order(assigned_values_list)
+    #         cv2.waitKey(-1)    
 
-    def break_days_combined_image(self, combinedImg):
-        st = 0
-        list_img_8hrs = []
-        while True:
-            end = st+8
-            if st == combinedImg.shape[1]:
-                break
-            crop = combinedImg[:, st:end]
-            list_img_8hrs.append(crop)
-            st = end
+    # def break_days_combined_image(self, combinedImg):
+    #     st = 0
+    #     list_img_8hrs = []
+    #     while True:
+    #         end = st+8
+    #         if st == combinedImg.shape[1]:
+    #             break
+    #         crop = combinedImg[:, st:end]
+    #         list_img_8hrs.append(crop)
+    #         st = end
         
-        vstacked = np.vstack(list_img_8hrs)
+    #     vstacked = np.vstack(list_img_8hrs)
         
-        return vstacked
-
-
+    #     return vstacked
 
     def assign_order_operation_wise(self, order):
         """Main starter function to try assign all operation of an order"""
         
         result_all_operation_assigned = self.try_assigning_all_operations(order)
         if result_all_operation_assigned == True:
+            
+            dict_machine_name_data_assignment = {}
+            
             for operation in order.operationSeq:
+                machineName = operation.machineReq.name
                 print(f"operation {operation.id} list_details {operation.day_st_end_assigned_list}")
-            # order.freeze_order()
+                dict_machine_name_data_assignment[machineName] = operation.day_st_end_assigned_list
+
+            DaySlotMachine.assignMachineHrs_for_order(dict_machine_name_data_assignment=dict_machine_name_data_assignment)
+
+
+            day_index_machine_list = []
+            for machineName, list_data_to_assign in dict_machine_name_data_assignment.items():
+                for data_to_assign in list_data_to_assign:
+                    dayIndex, stHrIndex, endHrIndex, cycle_or_delay = data_to_assign
+                    if [dayIndex, machineName] not in day_index_machine_list:
+                        day_index_machine_list.append([dayIndex, machineName])
+
+            # day_index_machine_list = list(set(day_index_machine_list))
+
+            daysList = [item[0] for item in day_index_machine_list]
+            machineList = [item[1] for item in day_index_machine_list]
+            minDay, maxDay = min(daysList), max(daysList)
+            dayList_machineName_to_display = []
+            lastMachineName = None
+            for day in range(minDay, maxDay,1):
+                if day not in daysList and lastMachineName is not None:
+                    dayList_machineName_to_display.append([day, lastMachineName])
+                
+                else:
+                    machineName = machineList[daysList.index(day)]
+                    dayList_machineName_to_display.append([day, machineName])
+                    lastMachineName = machineName
+
+
+            
+            imgList = []
+            title_list = []
+            for day, machineName in dayList_machineName_to_display:
+                imgDaySlotAssigned = DaySlotMachine.get_display_day_machine_color_block(dayIndex, machineName)
+                imgList.append(imgDaySlotAssigned)
+                title_list.append(f"{self.days_list[day]}__{machineName}")
+                    
+            utils2.plot_list_images(imgList, title_list)
+           
+            
+            
         else:
             ## Mark order as not assignable
             pass
-
       
     def try_assigning_all_operations(self, order, trial_start_hr=0, trial_start_day_index=0):
 
@@ -215,7 +255,7 @@ class ScheduleAssigner:
                 first_operation.temp_assigned_end_day_index, first_operation.temp_assigned_end_hr_index = endDelayDayIndex, endDelayHrIndex
 
         if first_operation_assigned_successfully ==True:
-
+            first_operation.day_st_end_assigned_list.extend(first_operation.delay_detail_list)
             print("FIRST operation temporary assignment details :")
             print(f"""Operation ID {first_operation.id} : Machine {first_operation.machineReq.name} 
             START {ScheduleAssigner.days_list[first_operation.temp_assigned_st_day_index]} 
@@ -227,7 +267,7 @@ class ScheduleAssigner:
         if first_operation_assigned_successfully==False:
             ## restart the operation
             if first_operation.temp_assigned_st_day_index is not None:
-
+                
                 print(f"PREVIOUS trial of start day {first_operation.temp_assigned_st_day_index} and hr {first_operation.temp_assigned_st_hr_index} not feasible")
                 next_trial =  first_operation.temp_assigned_st_hr_index + 1
                 print(f"TRYING NEXT trial for start day {first_operation.temp_assigned_st_day_index} and hr {next_trial} ")
@@ -283,14 +323,19 @@ class ScheduleAssigner:
 
 
             print("All operations assignable :: ", remaining_all_operation_assignable)
+            f = open(self.output_file, 'a+',  newline="")
+            csvWriter = csv.writer(f)
+            header = ["Operation_name", "machine_name", "CycleTime(Hrs)", "MinDelay",	"MaxDelay", "Start_date", "start_time", "end_date", "end_time"]
+            csvWriter.writerow(header)
             if remaining_all_operation_assignable==True:
                 for i, operation in enumerate(order.operationSeq):
-                    operation.freeze_operation_st_end_times()
-                    print(operation)
+                    operation.freeze_operation_st_end_times(self.days_list)
 
+                    csvWriter.writerow([operation.id, operation.machineReq.name, operation.cycleTimeHrs, operation.minDelayHrs, 
+                        operation.maxDelayHrs, operation.operationStart_date, 
+                        operation.operationStart_time, operation.operationEnd_date, operation.operationEnd_time])
 
-
-                pass
+                
             else:
                 ## restart the operation
                 if first_operation.temp_assigned_st_day_index is not None:
@@ -300,7 +345,8 @@ class ScheduleAssigner:
                     print(f"TRYING NEXT trial for start day {first_operation.temp_assigned_st_day_index} and hr {next_trial} ")
 
                     self.try_assigning_all_operations(order, trial_start_day_index= first_operation.temp_assigned_st_day_index, trial_start_hr=next_trial )
-
+            
+            f.close()
 
         return remaining_all_operation_assignable
 
@@ -308,7 +354,6 @@ class ScheduleAssigner:
     def get_day_machine_sch_img(self, dayIndex, machineName):
         day = ScheduleAssigner.days_list[dayIndex]
         return DaySlotMachine.daySchedules[day][machineName]
-
 
   
 class AssignerSingleOperation:
@@ -322,8 +367,6 @@ class AssignerSingleOperation:
         self.stHrIndex = stHrIndex
         self.operationGrayImg = operationGrayImg
         
-
-
         self.operationMachinName = operationMachinName
         
         self.list_day_oper_crop_images = []
@@ -418,27 +461,10 @@ class AssignerSingleOperation:
                 next_day_crop_gray = remaining_operation_gray_img[:,width_operation_remaining-hrs_remaining_for_next_day:]
                 return isOverlapPerfect, dayStartIndex, startHr, cropEndHr, next_day_crop_gray
 
-
-            
-        #     # work_subtracted_negativemask = mask_allowable_work-assigned_day_operation_work_mask
-
-            
-        #     showImg("stacked_delay_mask",stacked_delay_mask)
-        #     showImg("stacked_work_mask",stacked_work_mask)
-        #     showImg("diff_work",work_subtracted_mask)
-        #     # showImg("work_subtracted_negativemask",work_subtracted_negativemask)
-        #     cv2.waitKey(-1)            
-
-        # else:
-        #     pass
-
-
-
     def iterate_operation_working_mask(self):
 
 
-        """
-        """
+        """            """
         ### RETURN VALUES
         assinged_work_operation_day_st_index = None
         assinged_work_operation_day_st_hr = None
@@ -469,18 +495,9 @@ class AssignerSingleOperation:
 
                         dayStartIndex=current_day_index, startHr=start_working_hr)
 
-
-              
-
-
-
     def stretch_min_max_delay_working_mask(self):
         """"""
         pass
-
-
-    
-    
 
     def check_if_color_on_gray(self,work_subtracted_mask, assigned_day_operation_work_mask):
         """check if operation_work_mask overlapps on day_work_mask, if extra left, return end hr to crop
@@ -527,7 +544,4 @@ class Validator:
         """"""
         pass
         
-
-
-
 

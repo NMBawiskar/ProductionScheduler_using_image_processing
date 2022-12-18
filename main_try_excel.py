@@ -26,6 +26,11 @@ inputDataObj.createAllDaySlots()
 dayList = list(DaySlotMachine.daySchedules.keys())
 scheduleAssigner = ScheduleAssigner()
 ScheduleAssigner.days_list = dayList
+DaySlotMachine.days_list = dayList
+
+
+
+
 for orderToProcess in Order_or_job.orderList:
     try:
         # scheduleAssigner.assign_single_order(order=orderToProcess)
@@ -35,3 +40,4 @@ for orderToProcess in Order_or_job.orderList:
     
     except Exception as e:
         print(traceback.print_exc())
+

@@ -8,7 +8,6 @@ def showImg(title, img):
     resized = cv2.resize(img, None, fx=10, fy=10, interpolation=cv2.INTER_AREA)
     cv2.namedWindow(title, cv2.WINDOW_NORMAL)
     cv2.imshow(title, resized)
-    
 
 def get_operation_work_and_delay_masks(self, operation_gray_img):
     """function to return mask_working and mask_delay from the operation_gray_img"""
@@ -21,7 +20,6 @@ def get_operation_work_and_delay_masks(self, operation_gray_img):
     mask_operation_delay[operation_gray_img==config.DELAY_COLOR] = 255
 
     return mask_operation_work, mask_operation_delay
-
 
 def get_starting_hr_operation_working(mask_allowable_work):
 
@@ -49,16 +47,12 @@ def check_if_it_has_more_than_1_white_blocks(mask_img):
 
     contours, heirarchy = cv2.findContours(mask_img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
     for cnt in contours:
-        # print(np.min(cnt, axis=0))
-        # print(np.min(cnt, axis=1))
-        # print(np.min(cnt, axis=2))
-
+        
         min_x = np.min(cnt, axis=0)[0][0]
         max_x = np.max(cnt, axis=0)[0][0]
         start_end_list.append([min_x, max_x])
 
     return len(contours), start_end_list
-
 
 def plot_3_images(img1,img2,img3):
     fig = plt.figure(figsize=(10,24))
@@ -73,13 +67,12 @@ def plot_3_images(img1,img2,img3):
 def get_day_machine_sch_img(dayIndex, machineName):
     return ScheduleAssigner.get_day_machine_sch_img(dayIndex=dayIndex, machineName=machineName)
 
-
 def plot_list_images(list_images, list_titles):
     fig = plt.figure(figsize=(10,24))
     for i in range(len(list_images)):
         sub =plt.subplot(len(list_images),1,i+1)
         sub.imshow(list_images[i])
-        sub.set_xticks(np.arange(0, 24, 24))
-        plt.title(list_titles[i])
-        # ax = plt.axis()
-    plt.show()
+        plt.xlim(0,24)
+        plt.tick_params(axis='y',left = False, labelleft = False, )
+        sub.set_xticks(np.arange(0, 24, 1))
+        sub.set_ylabel(list_titles[i], rotation=0, labelpad=40)

@@ -4,6 +4,8 @@ import cv2
 from required_classes.machines_ import Machine
 from collections import OrderedDict
 import config
+from matplotlib import pyplot as plt
+import utils2
 
 AVAILABLE = 255
 NOT_AVAILABLE = 0
@@ -19,6 +21,7 @@ class DaySlotMachine:
     
     # weekSchedules = {}
     daySchedules = OrderedDict()
+    days_list = []
 
     def __init__(self, day, machine:Machine):
         self.day = day
@@ -54,6 +57,9 @@ class DaySlotMachine:
         self.mask_operation_overlap_allowable = None
         self.mask_delay_overlap_allowable = None
         self.mask_assigned_hrs = None
+        self.display_img_block = None
+
+        
 
     def assignMachineHrs_filled(self, listHrsBooked:List[int]):
         """Function takes in list of hrs ex. [10,11,12,13,14] adds them to self.hrs_filled_up"""
@@ -79,14 +85,18 @@ class DaySlotMachine:
         self.daySlotArray[:,:stHr] = NOT_AVAILABLE
         self.daySlotArray[:,stHr:endHr] = AVAILABLE
         self.daySlotArray[:,endHr:] = NOT_AVAILABLE
-        
+        self.display_img_block = cv2.merge((self.daySlotArray, self.daySlotArray, self.daySlotArray))
+        self.render_display_img()
         self.get_gray_day_slot_img()
+
+
+
 
     def assign_weekend_day(self):
         self.daySlotArray[:,:] = NOT_AVAILABLE
+        self.display_img_block = cv2.merge((self.daySlotArray, self.daySlotArray, self.daySlotArray))
+        self.render_display_img()
         self.get_gray_day_slot_img()
-
-
     
     def create_img(self):
         oneCh = self.daySlotArray.copy()
@@ -179,5 +189,45 @@ class DaySlotMachine:
 
         return hr_list_crop
 
-    def assignMachineHrs_from(self, fromStartIndex):
-        self.daySlotArray[:, :]
+    @classmethod
+    def assignMachineHrs_for_order(self, dict_machine_name_data_assignment):
+        
+        """data_to_assign is list [dayIndex, st_hrIndex, end_hrInde, 0 or 1]  0-cycleAssigned, 1-delayAssigned"""
+        all_order_images = []
+        title_list = []
+        for machineName, list_data_to_assign in dict_machine_name_data_assignment.items(): 
+            for data_to_assign in list_data_to_assign:
+                dayIndex, stHrIndex, endHrIndex, cycle_or_delay = data_to_assign
+                day = self.days_list[dayIndex]
+                # daySlot = self.daySchedules[day][machineName]
+                DaySlotMachine.daySchedules[day][machineName].daySlotArray[:, stHrIndex:endHrIndex] = ASSIGNED
+            
+                DaySlotMachine.daySchedules[day][machineName].get_gray_day_slot_img()
+                if cycle_or_delay == 0:
+                    ## cycle color 
+                    color_assignment = config.DISPLAY_ASSIGNED_CYCLE_COLOR
+                elif cycle_or_delay== 1:
+                    color_assignment = config.DISPLAY_ASSIGNED_DELAY_COLOR
+
+                DaySlotMachine.daySchedules[day][machineName].display_img_block[:,stHrIndex:endHrIndex] = color_assignment
+                all_order_images.append(DaySlotMachine.daySchedules[day][machineName].display_img_block)
+                title_list.append(f"{day}_{machineName}_{stHrIndex}__{endHrIndex}__{cycle_or_delay}")
+        utils2.plot_list_images(all_order_images,title_list)
+            
+
+    def render_display_img(self):
+        self.display_img_block[self.daySlotArray==ASSIGNED] = config.DISPLAY_ASSIGNED_CYCLE_COLOR
+        self.display_img_block[self.daySlotArray==NOT_AVAILABLE] = config.DISPLAY_NOT_ASSIGNED_NON_WORKING_COLOR
+        self.display_img_block[self.daySlotArray==AVAILABLE] = config.DISPLAY_NOT_ASSIGNED_WORKING_COLOR
+        
+
+    
+    @classmethod
+    def get_display_day_machine_color_block(self, date_index, machineName):
+        day = self.days_list[date_index]
+        daySCh = self.daySchedules[day][machineName]
+       
+        display_img = daySCh.display_img_block
+        # utils.showImg(f'DayBlockDisplay_{day}',display_img)
+        # cv2.waitKey(-1)
+        return display_img

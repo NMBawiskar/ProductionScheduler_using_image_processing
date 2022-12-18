@@ -48,7 +48,7 @@ class InputDataGenerator:
         
         # print("self.df_prod_req",self.df_prod_req)
         list_orderNames = list(set(self.df_prod_req['OrderId'])) 
-
+        list_orderNames = sorted(list_orderNames)
         self.df_prod_req = self.df_prod_req.set_index('OrderId')
         for orderName in list_orderNames:
             # print(self.df_prod_req.loc[orderName])
