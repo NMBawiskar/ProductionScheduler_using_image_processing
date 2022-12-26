@@ -58,8 +58,7 @@ class DaySlotMachine:
         self.mask_delay_overlap_allowable = None
         self.mask_assigned_hrs = None
         self.display_img_block = None
-
-        
+     
 
     def assignMachineHrs_filled(self, listHrsBooked:List[int]):
         """Function takes in list of hrs ex. [10,11,12,13,14] adds them to self.hrs_filled_up"""
@@ -88,9 +87,6 @@ class DaySlotMachine:
         self.display_img_block = cv2.merge((self.daySlotArray, self.daySlotArray, self.daySlotArray))
         self.render_display_img()
         self.get_gray_day_slot_img()
-
-
-
 
     def assign_weekend_day(self):
         self.daySlotArray[:,:] = NOT_AVAILABLE
@@ -224,8 +220,8 @@ class DaySlotMachine:
     
     @classmethod
     def get_display_day_machine_color_block(self, date_index, machineName):
-        day = self.days_list[date_index]
-        daySCh = self.daySchedules[day][machineName]
+        day = DaySlotMachine.days_list[date_index]
+        daySCh = DaySlotMachine.daySchedules[day][machineName]
        
         display_img = daySCh.display_img_block
         # utils.showImg(f'DayBlockDisplay_{day}',display_img)

@@ -5,14 +5,10 @@ from required_classes.prod_req import *
 from required_classes.machine_sch import *
 import traceback
 
-excel_path = r'input_data\Requirements_Data_edited.xlsx'
-
+excel_path = r'input_data\NewData_121822.xlsx'
 
 inputDataObj= InputDataGenerator(excelFilePath=excel_path)
 inputDataObj.createAllMachineObjects()
-
-
-# print(inputDataObj.df_prod_req.head())
 
 daysList = inputDataObj.df_machine_sch['StartDate'].tolist()
 inputDataObj.createAllOrders()

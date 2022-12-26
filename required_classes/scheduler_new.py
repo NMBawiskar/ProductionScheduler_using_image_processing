@@ -1,4 +1,5 @@
 from required_classes.prod_req import *
+
 from required_classes.machine_sch import DaySlotMachine
 from matplotlib import pyplot as plt 
 import cv2
@@ -184,14 +185,14 @@ class ScheduleAssigner:
                     if [dayIndex, machineName] not in day_index_machine_list:
                         day_index_machine_list.append([dayIndex, machineName])
 
-            # day_index_machine_list = list(set(day_index_machine_list))
+            
 
             daysList = [item[0] for item in day_index_machine_list]
             machineList = [item[1] for item in day_index_machine_list]
             minDay, maxDay = min(daysList), max(daysList)
             dayList_machineName_to_display = []
             lastMachineName = None
-            for day in range(minDay, maxDay,1):
+            for day in range(minDay, maxDay+1,1):
                 if day not in daysList and lastMachineName is not None:
                     dayList_machineName_to_display.append([day, lastMachineName])
                 
@@ -225,6 +226,9 @@ class ScheduleAssigner:
         ### 4. If assigned return current operation end Hr and end dayIndex, take next operation at End hour and end day of prev operation
         ### Repeat the process above
         
+        ### Make CycleAssignerValidator list empty
+        # make_cycle_assigner_list_empty()
+
         n_operations = len(order.operationSeq)
         first_operation_assigned_successfully = True
         remaining_all_operation_assignable = True
@@ -320,6 +324,16 @@ class ScheduleAssigner:
                     """)
                     prev_op_end_day_index = endDelayDayIndex
                     prev_op_end_hr_index = endDelayHrIndex
+
+                else:
+                    ### Not assigned next opearation
+                    remaining_all_operation_assignable = False
+                    print(f"PREVIOUS trial of start day {first_operation.temp_assigned_st_day_index} and hr {first_operation.temp_assigned_st_hr_index} not feasible")
+                    next_trial =  first_operation.temp_assigned_st_hr_index + 1
+                    print(f"TRYING NEXT trial for start day {first_operation.temp_assigned_st_day_index} and hr {next_trial} ")
+                    self.try_assigning_all_operations(order, trial_start_day_index= first_operation.temp_assigned_st_day_index, trial_start_hr=next_trial )
+
+
 
 
             print("All operations assignable :: ", remaining_all_operation_assignable)

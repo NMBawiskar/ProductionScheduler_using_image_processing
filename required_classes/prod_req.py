@@ -103,6 +103,10 @@ class Operation:
         """will assing temporary start day and hr and 
         return endCycleDay, endCycleHr for DelayAssignment"""
         # validate_if dayStartIndex
+        if isFirstOrder:
+            CycleAssignerValidator.validator_list= []
+            CycleAssignerValidator.list_mask_assigned = []
+
         if dayStartIndex is None:
 
             print("got dayStartIndex as None ???")
@@ -115,7 +119,7 @@ class Operation:
         
         cycleAssigner = CycleAssignerValidator(self.cycleTimeHrs, trialStDayIndex=dayStartIndex, trialStHr=trialStHr, machineName=self.machineReq.name)
         print("trying to set operation -->")
-        self.print_operation_schedule()
+        # self.print_operation_schedule()
         isAssigned = cycleAssigner.try_assigning_first_operation(isFirstOrder=isFirstOrder)
         if isAssigned==True:
             self.temp_assigned_st_day_index = cycleAssigner.list_day_wise_assigned_details[0][0]
@@ -300,15 +304,12 @@ class Operation:
             self.operation_end_hr_index = self.temp_assigned_end_hr_index
             self.operationEnd_time = self.operation_end_hr_index
 
-    def get_display_color_slot(self):
-
-        pass
-
-
 
 
 
 class CycleAssignerValidator:
+    validator_list = []
+    list_mask_assigned = []
     def __init__(self, cycleTimeHrs, trialStDayIndex, trialStHr, machineName):
         self.cycleTimeHrs = cycleTimeHrs
         self.trialStDayIndex = trialStDayIndex
@@ -351,7 +352,7 @@ class CycleAssignerValidator:
                 ## calculate remaining time for assignment
                 hrs_allowable_for_assign = np.sum(mask_allowable_work==255)
                 print("Hrs available for assigning work", hrs_allowable_for_assign)
-                if hrs_allowable_for_assign < self.remaining_cycle_hrs_to_assign:
+                if hrs_allowable_for_assign <= self.remaining_cycle_hrs_to_assign:
                     ## cropping needed
                     crop_curr_day = mask_cycle[:,:hrs_allowable_for_assign]
                     self.list_crops_assigned.append(crop_curr_day)
@@ -383,6 +384,20 @@ class CycleAssignerValidator:
 
             else:
                 current_day_st_index+=1
+                # if isFirstOrder==True:
+                #     current_day_st_index+=1
+
+                # if isFirstOrder==False and daySchObj.dayStHr is None:
+                #     current_day_st_index+=1
+                # elif isFirstOrder==False and daySchObj.dayStHr:
+                #     return False
+
+                # if isFirstOrder==False and len(self.list_crops_assigned)==0:
+                #     ## dont allow for first instance of next operation
+                
+
+        CycleAssignerValidator.validator_list.extend(self.list_day_wise_assigned_details)
+        CycleAssignerValidator.list_mask_assigned.extend(self.list_mask_assigned_hrs)
 
         validation_result = self.validate_cycle_assignment_rules()
         if validation_result==True:
@@ -421,26 +436,26 @@ class CycleAssignerValidator:
         """"""
         
         result = False  
-        
-        for i in range(len(self.list_day_wise_assigned_details)):
-            if i >0:
-                ## get prev day endhr_cycle to dayEnd
-                dayIndex_prev, stHr_prev, endHr_prev, cycle_or_delay = self.list_day_wise_assigned_details[i-1]
-                prev_day_assigned_already = self.list_mask_assigned_hrs[i-1][:, endHr_prev:]
+        if len(CycleAssignerValidator.validator_list)>0:
+            for i in range(len(CycleAssignerValidator.validator_list)):
+                if i >0:
+                    ## get prev day endhr_cycle to dayEnd
+                    dayIndex_prev, stHr_prev, endHr_prev, cycle_or_delay = CycleAssignerValidator.validator_list[i-1]
+                    prev_day_assigned_already = CycleAssignerValidator.list_mask_assigned[i-1][:, endHr_prev:]
 
-                dayIndex_cur, stHr_cur, endHr_cur, cycle_or_delay = self.list_day_wise_assigned_details[i]
-                curr_day_assigned_already = self.list_mask_assigned_hrs[i][:, stHr_cur:] 
-                ## join and check both ``
+                    dayIndex_cur, stHr_cur, endHr_cur, cycle_or_delay = CycleAssignerValidator.validator_list[i]
+                    curr_day_assigned_already = CycleAssignerValidator.list_mask_assigned[i][:, stHr_cur:] 
+                    ## join and check both ``
 
-                total_mask_assigned_between_ = np.hstack((prev_day_assigned_already, curr_day_assigned_already))
-                count_white_blocks, st_end_list = utils.check_if_it_has_more_than_1_white_blocks(total_mask_assigned_between_)
-                if count_white_blocks==0:
-                    ## Means no any other order assigned between 
-                    pass
-                else:
-                    ## Means there present order between the
-                    result=True
-                    break
+                    total_mask_assigned_between_ = np.hstack((prev_day_assigned_already, curr_day_assigned_already))
+                    count_white_blocks, st_end_list = utils.check_if_it_has_more_than_1_white_blocks(total_mask_assigned_between_)
+                    if count_white_blocks==0:
+                        ## Means no any other order assigned between 
+                        pass
+                    else:
+                        ## Means there present order between the
+                        result=True
+                        break
 
         return result
 
