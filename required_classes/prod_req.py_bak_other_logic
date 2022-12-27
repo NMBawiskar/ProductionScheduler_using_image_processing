@@ -342,7 +342,7 @@ class CycleAssignerValidator:
             dayGrayImg, mask_allowable_work = daySchObj.gray_day_slot_img, daySchObj.mask_operation_overlap_allowable
             if mask_allowable_work is not None and firstInstance==True:
                 mask_allowable_work[:, :current_hr_st_index] = 0
-                firstInstance = False
+            #     firstInstance = False
             
             mask_assigned_hrs = daySchObj.mask_assigned_hrs
 
@@ -355,14 +355,14 @@ class CycleAssignerValidator:
                 mask_allowable_work[:, :current_hr_st_index] = 0
                 ## calculate remaining time for assignment
                 hrs_allowable_for_assign = np.sum(mask_allowable_work==255)
-                # if firstInstance==True:
-                #     ## can be assigned
-                #     ## if 
-                #     if mask_allowable_work[:,current_hr_st_index]==255:
-                #         ## can be assigned
-                #         firstInstance=False
-                #     else:
-                #         return False
+                if firstInstance==True:
+                    ## can be assigned
+                    ## if 
+                    if mask_allowable_work[:,current_hr_st_index]==255:
+                        ## can be assigned
+                        firstInstance=False
+                    else:
+                        return False
 
                 print("Hrs available for assigning work", hrs_allowable_for_assign)
                 if hrs_allowable_for_assign <= self.remaining_cycle_hrs_to_assign:
@@ -396,11 +396,11 @@ class CycleAssignerValidator:
                     # utils.plot_list_images([assigned_crop_img, mask_assigned_hrs, dayGrayImg],["assigned_crop_img", "mask_assigned_hrs", "dayGrayImg"] )
 
             else:
-                # if firstInstance==True and isFirstOrder==False:
-                #     return False
+                if firstInstance==True and isFirstOrder==False:
+                    return False
 
-                # else:
-                current_day_st_index+=1
+                else:
+                    current_day_st_index+=1
                 
                 # if isFirstOrder==True:
                 #     current_day_st_index+=1
@@ -426,7 +426,7 @@ class CycleAssignerValidator:
             ## Retry assigning with + 1 hour
             if isFirstOrder==True:
                 self.trialStHr+= self.increment
-                # self.try_assigning()
+                self.try_assigning()
             else:
                 return False
 

@@ -218,6 +218,95 @@ class ScheduleAssigner:
             ## Mark order as not assignable
             pass
       
+    def validate_if_prev_op_cycle_ends_at_day_end(self, prev_op_assignent_list, curr_op_assignment_list, prev_op_max_delay_hrs):
+        
+        prev_cycle_day_index, end_hr_prev_cycle = None, None
+        curr_cycle_day_index, start_hr_curr_cycle = None, None
+        
+        new_prev_op_delay_stretched_list = []
+
+        for op_assigned in prev_op_assignent_list[::-1]:
+            day_index, st_hr, end_hr, type_cycle_delay = op_assigned
+            if type_cycle_delay==0:
+                prev_cycle_day_index, end_hr_prev_cycle = day_index, end_hr
+                break
+
+        for op_assigned in prev_op_assignent_list[::-1]:
+            day_index, st_hr, end_hr, type_cycle_delay = op_assigned
+            if type_cycle_delay==0:
+                new_prev_op_delay_stretched_list.append(op_assigned)
+                
+        
+        for op_assigned in curr_op_assignment_list:
+            day_index, st_hr, end_hr, type_cycle_delay = op_assigned
+            if type_cycle_delay==0:
+                curr_cycle_day_index, start_hr_curr_cycle = day_index, st_hr
+                break
+        
+
+        if prev_cycle_day_index and  end_hr_prev_cycle and curr_cycle_day_index and start_hr_curr_cycle:
+            hrs_to_elapse = 0
+            delay_stretched_new_list = []
+            if prev_cycle_day_index == curr_cycle_day_index:
+                ## Same day start of next operation
+                hrs_to_elapse = start_hr_curr_cycle - end_hr_prev_cycle
+                delay_stretched_new_list.append([prev_cycle_day_index, start_hr_curr_cycle, end_hr_prev_cycle, 1])
+
+
+            else:
+                ## Next day start of next operation
+                for day_index in range(prev_cycle_day_index, curr_cycle_day_index+1):
+                    if day_index==prev_cycle_day_index:
+                        hrs_to_accomodate = 24 - end_hr_prev_cycle
+                        list_delay_to_add = [day_index, end_hr_prev_cycle, 24, 1]
+                    elif day_index==curr_cycle_day_index:
+                        hrs_to_accomodate = start_hr_curr_cycle - 1
+                        list_delay_to_add = [day_index, 0, start_hr_curr_cycle, 1]
+                    else:
+                        hrs_to_accomodate = 24
+                        list_delay_to_add = [day_index, 0, 24, 1]
+                    hrs_to_elapse+= hrs_to_accomodate 
+                    delay_stretched_new_list.append(list_delay_to_add)           
+
+            if hrs_to_elapse >1:
+                ### Check if prev_operation_max_delay can accomodate this
+                if hrs_to_elapse<= prev_op_max_delay_hrs:
+                    ## OK can go further
+                    ## create new_list_of prev operation
+                    
+                    new_prev_op_delay_stretched_list.extend(delay_stretched_new_list)
+                    return True, new_prev_op_delay_stretched_list
+                else:
+                    return False, []
+            else:
+                ## no time gap 
+                return True, prev_op_assignent_list
+
+
+
+    def restart_assigning_with_next_hour(self, order):
+
+        n_operations = len(order.operationSeq)
+        first_operation = order.operationSeq[0]
+        for i in range(n_operations):
+            operation = order.operationSeq[i]
+            ### Reset all day assignment list 
+            operation.day_st_end_assigned_list = []
+
+        if first_operation.temp_assigned_st_hr_index==23:
+            next_trial_st_hr =  0
+            next_trial_day_index = first_operation.temp_assigned_st_day_index + 1
+
+        else:
+            next_trial_st_hr = first_operation.temp_assigned_st_hr_index + 1
+            next_trial_day_index = first_operation.temp_assigned_st_day_index
+
+        print(f"PREVIOUS trial of start day {first_operation.temp_assigned_st_day_index} and hr {first_operation.temp_assigned_st_hr_index} not feasible")
+        print(f"TRYING NEXT trial for start day {next_trial_day_index} and hr {next_trial_st_hr} ")
+        self.try_assigning_all_operations(order, trial_start_day_index=next_trial_day_index, 
+            trial_start_hr= next_trial_st_hr )
+
+
     def try_assigning_all_operations(self, order, trial_start_hr=0, trial_start_day_index=0):
 
         ### 1. Get first/next operation, its machine name, start day and start hour 
@@ -271,12 +360,12 @@ class ScheduleAssigner:
         if first_operation_assigned_successfully==False:
             ## restart the operation
             if first_operation.temp_assigned_st_day_index is not None:
-                
-                print(f"PREVIOUS trial of start day {first_operation.temp_assigned_st_day_index} and hr {first_operation.temp_assigned_st_hr_index} not feasible")
-                next_trial =  first_operation.temp_assigned_st_hr_index + 1
-                print(f"TRYING NEXT trial for start day {first_operation.temp_assigned_st_day_index} and hr {next_trial} ")
+                self.restart_assigning_with_next_hour(order)
+                # print(f"PREVIOUS trial of start day {first_operation.temp_assigned_st_day_index} and hr {first_operation.temp_assigned_st_hr_index} not feasible")
+                # next_trial =  first_operation.temp_assigned_st_hr_index + 1
+                # print(f"TRYING NEXT trial for start day {first_operation.temp_assigned_st_day_index} and hr {next_trial} ")
 
-                self.try_assigning_all_operations(order, trial_start_day_index= first_operation.temp_assigned_st_day_index, trial_start_hr=next_trial )
+                # self.try_assigning_all_operations(order, trial_start_day_index= first_operation.temp_assigned_st_day_index, trial_start_hr=next_trial )
 
         else:
             ### Try assigning next operations    
@@ -292,6 +381,29 @@ class ScheduleAssigner:
                 endCycleDayIndex, endCycleHrIndex = next_operation.try_assigning_op_cycle(prev_op_end_day_index, prev_op_end_hr_index, isFirstOrder=False)
 
                 if endCycleDayIndex is not None:
+                    ### Check if previous operation cycle part ends at day end and it has delay to accomodate all hours within
+                    prev_operation = order.operationSeq[i-1]
+                    prev_operation_cycle_end_time = prev_operation.day_st_end_assigned_list
+                    print("prev_operation_cycle_end_time",prev_operation_cycle_end_time)
+
+                    result_validation, new_prev_order_assignment_list = self.validate_if_prev_op_cycle_ends_at_day_end(prev_operation_cycle_end_time, curr_op_assignment_list=next_operation.day_st_end_assigned_list,
+                        prev_op_max_delay_hrs= prev_operation.maxDelayHrs)
+
+                    if result_validation==True:
+                        order.operationSeq[i-1].day_st_end_assigned_list = new_prev_order_assignment_list
+                        
+                    else:
+                        ### Not assigned next opearation
+                        remaining_all_operation_assignable = False
+                        self.restart_assigning_with_next_hour(order)
+                        # first_operation.day_st_end_assigned_list = []
+                        # next_operation.day_st_end_assigned_list = []
+                        # print(f"PREVIOUS trial of start day {first_operation.temp_assigned_st_day_index} and hr {first_operation.temp_assigned_st_hr_index} not feasible")
+                        # next_trial =  first_operation.temp_assigned_st_hr_index + 1
+                        # print(f"TRYING NEXT trial for start day {first_operation.temp_assigned_st_day_index} and hr {next_trial} ")
+                        # self.try_assigning_all_operations(order, trial_start_day_index= first_operation.temp_assigned_st_day_index, trial_start_hr=next_trial )
+
+
                     ## if delay hrs in operation
                     if next_operation.maxDelayHrs>0:
                         ### try assigning delay hrs
@@ -307,7 +419,7 @@ class ScheduleAssigner:
                         else:
                             #assignable 
                             # extend delay st end details list
-                            
+                              
                             next_operation.day_st_end_assigned_list.extend(next_operation.delay_detail_list)
 
 
@@ -328,10 +440,13 @@ class ScheduleAssigner:
                 else:
                     ### Not assigned next opearation
                     remaining_all_operation_assignable = False
-                    print(f"PREVIOUS trial of start day {first_operation.temp_assigned_st_day_index} and hr {first_operation.temp_assigned_st_hr_index} not feasible")
-                    next_trial =  first_operation.temp_assigned_st_hr_index + 1
-                    print(f"TRYING NEXT trial for start day {first_operation.temp_assigned_st_day_index} and hr {next_trial} ")
-                    self.try_assigning_all_operations(order, trial_start_day_index= first_operation.temp_assigned_st_day_index, trial_start_hr=next_trial )
+                    self.restart_assigning_with_next_hour(order)
+                    # first_operation.day_st_end_assigned_list = []
+                    # next_operation.day_st_end_assigned_list = []
+                    # print(f"PREVIOUS trial of start day {first_operation.temp_assigned_st_day_index} and hr {first_operation.temp_assigned_st_hr_index} not feasible")
+                    # next_trial =  first_operation.temp_assigned_st_hr_index + 1
+                    # print(f"TRYING NEXT trial for start day {first_operation.temp_assigned_st_day_index} and hr {next_trial} ")
+                    # self.try_assigning_all_operations(order, trial_start_day_index= first_operation.temp_assigned_st_day_index, trial_start_hr=next_trial )
 
 
 
@@ -353,12 +468,12 @@ class ScheduleAssigner:
             else:
                 ## restart the operation
                 if first_operation.temp_assigned_st_day_index is not None:
+                    self.restart_assigning_with_next_hour(order)
+                    # print(f"PREVIOUS trial of start day {first_operation.temp_assigned_st_day_index} and hr {first_operation.temp_assigned_st_hr_index} not feasible")
+                    # next_trial =  first_operation.temp_assigned_st_hr_index + 1
+                    # print(f"TRYING NEXT trial for start day {first_operation.temp_assigned_st_day_index} and hr {next_trial} ")
 
-                    print(f"PREVIOUS trial of start day {first_operation.temp_assigned_st_day_index} and hr {first_operation.temp_assigned_st_hr_index} not feasible")
-                    next_trial =  first_operation.temp_assigned_st_hr_index + 1
-                    print(f"TRYING NEXT trial for start day {first_operation.temp_assigned_st_day_index} and hr {next_trial} ")
-
-                    self.try_assigning_all_operations(order, trial_start_day_index= first_operation.temp_assigned_st_day_index, trial_start_hr=next_trial )
+                    # self.try_assigning_all_operations(order, trial_start_day_index= first_operation.temp_assigned_st_day_index, trial_start_hr=next_trial )
             
             f.close()
 
