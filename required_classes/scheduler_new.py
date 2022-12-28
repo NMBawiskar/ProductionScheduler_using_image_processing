@@ -164,9 +164,28 @@ class ScheduleAssigner:
 
     def assign_order_operation_wise(self, order):
         """Main starter function to try assign all operation of an order"""
-        
+
+        total_days_to_check = len(DaySlotMachine.days_list)    
         result_all_operation_assigned = self.try_assigning_all_operations(order)
+        while True:
+            if result_all_operation_assigned==True:
+                break
+            else:
+                first_operation = order.operationSeq[0]
+                if first_operation.temp_assigned_st_day_index == total_days_to_check-1:
+                    if first_operation.temp_assigned_st_hr_index == 23:
+                        break
+                try:
+                    result_all_operation_assigned = self.restart_assigning_with_next_hour(order)
+                except IndexError:
+                    break
+                
+        
+        
+        
+        
         if result_all_operation_assigned == True:
+            order.isInfeasibleForProduction = False
             
             dict_machine_name_data_assignment = {}
             
@@ -211,12 +230,12 @@ class ScheduleAssigner:
                 title_list.append(f"{self.days_list[day]}__{machineName}")
                     
             utils2.plot_list_images(imgList, title_list)
-           
-            
             
         else:
             ## Mark order as not assignable
-            pass
+            order.isInfeasibleForProduction = True
+            
+        self.save_result_to_csv_file(order)
       
     def validate_if_prev_op_cycle_ends_at_day_end(self, prev_op_assignent_list, curr_op_assignment_list, prev_op_max_delay_hrs):
         
@@ -231,7 +250,7 @@ class ScheduleAssigner:
                 prev_cycle_day_index, end_hr_prev_cycle = day_index, end_hr
                 break
 
-        for op_assigned in prev_op_assignent_list[::-1]:
+        for op_assigned in prev_op_assignent_list:
             day_index, st_hr, end_hr, type_cycle_delay = op_assigned
             if type_cycle_delay==0:
                 new_prev_op_delay_stretched_list.append(op_assigned)
@@ -250,7 +269,7 @@ class ScheduleAssigner:
             if prev_cycle_day_index == curr_cycle_day_index:
                 ## Same day start of next operation
                 hrs_to_elapse = start_hr_curr_cycle - end_hr_prev_cycle
-                delay_stretched_new_list.append([prev_cycle_day_index, start_hr_curr_cycle, end_hr_prev_cycle, 1])
+                delay_stretched_new_list.append([prev_cycle_day_index, end_hr_prev_cycle, start_hr_curr_cycle, 1])
 
 
             else:
@@ -282,7 +301,9 @@ class ScheduleAssigner:
                 ## no time gap 
                 return True, prev_op_assignent_list
 
-
+        
+        
+        return False, []
 
     def restart_assigning_with_next_hour(self, order):
 
@@ -303,8 +324,32 @@ class ScheduleAssigner:
 
         print(f"PREVIOUS trial of start day {first_operation.temp_assigned_st_day_index} and hr {first_operation.temp_assigned_st_hr_index} not feasible")
         print(f"TRYING NEXT trial for start day {next_trial_day_index} and hr {next_trial_st_hr} ")
-        self.try_assigning_all_operations(order, trial_start_day_index=next_trial_day_index, 
-            trial_start_hr= next_trial_st_hr )
+        result_all_operation_assigned = self.try_assigning_all_operations(order, trial_start_day_index=next_trial_day_index, 
+            trial_start_hr= next_trial_st_hr)
+
+
+        return result_all_operation_assigned
+
+    def save_result_to_csv_file(self, order):
+        f = open(self.output_file, 'a+',  newline="")
+        csvWriter = csv.writer(f)
+        header = ["Operation_name", "machine_name", "CycleTime(Hrs)", "MinDelay",	"MaxDelay", "Start_date", "start_time", "end_date", "end_time"]
+        csvWriter.writerow(header)
+        
+        for i, operation in enumerate(order.operationSeq):
+            operation.freeze_operation_st_end_times(self.days_list)
+            if order.isInfeasibleForProduction == False:
+
+                csvWriter.writerow([operation.id, operation.machineReq.name, operation.cycleTimeHrs, operation.minDelayHrs, 
+                    operation.maxDelayHrs, operation.operationStart_date, 
+                    operation.operationStart_time, operation.operationEnd_date, operation.operationEnd_time])
+            else:
+                csvWriter.writerow([operation.id, operation.machineReq.name, operation.cycleTimeHrs, operation.minDelayHrs, 
+                    operation.maxDelayHrs, "Not_feasible", 
+                    "-", "-", "-"])
+
+
+        f.close()
 
 
     def try_assigning_all_operations(self, order, trial_start_hr=0, trial_start_day_index=0):
@@ -333,7 +378,10 @@ class ScheduleAssigner:
             ## if delay hrs in operation
             if first_operation.maxDelayHrs>0:
                 ### try assigning delay hrs
-                endDelayDayIndex, endDelayHrIndex = first_operation.try_assigning_op_delay(endCycleDayIndex, endCycleHrIndex)
+                try:
+                    endDelayDayIndex, endDelayHrIndex = first_operation.try_assigning_op_delay(endCycleDayIndex, endCycleHrIndex)
+                except IndexError:
+                    return False
                 first_operation.temp_assigned_end_day_index, first_operation.temp_assigned_end_hr_index = endDelayDayIndex, endDelayHrIndex
                 if endDelayDayIndex is None:
                     #### Operation not assignable 
@@ -360,12 +408,9 @@ class ScheduleAssigner:
         if first_operation_assigned_successfully==False:
             ## restart the operation
             if first_operation.temp_assigned_st_day_index is not None:
-                self.restart_assigning_with_next_hour(order)
-                # print(f"PREVIOUS trial of start day {first_operation.temp_assigned_st_day_index} and hr {first_operation.temp_assigned_st_hr_index} not feasible")
-                # next_trial =  first_operation.temp_assigned_st_hr_index + 1
-                # print(f"TRYING NEXT trial for start day {first_operation.temp_assigned_st_day_index} and hr {next_trial} ")
-
-                # self.try_assigning_all_operations(order, trial_start_day_index= first_operation.temp_assigned_st_day_index, trial_start_hr=next_trial )
+                # self.restart_assigning_with_next_hour(order)
+                return False
+                
 
         else:
             ### Try assigning next operations    
@@ -395,15 +440,9 @@ class ScheduleAssigner:
                     else:
                         ### Not assigned next opearation
                         remaining_all_operation_assignable = False
-                        self.restart_assigning_with_next_hour(order)
-                        # first_operation.day_st_end_assigned_list = []
-                        # next_operation.day_st_end_assigned_list = []
-                        # print(f"PREVIOUS trial of start day {first_operation.temp_assigned_st_day_index} and hr {first_operation.temp_assigned_st_hr_index} not feasible")
-                        # next_trial =  first_operation.temp_assigned_st_hr_index + 1
-                        # print(f"TRYING NEXT trial for start day {first_operation.temp_assigned_st_day_index} and hr {next_trial} ")
-                        # self.try_assigning_all_operations(order, trial_start_day_index= first_operation.temp_assigned_st_day_index, trial_start_hr=next_trial )
-
-
+                        # self.restart_assigning_with_next_hour(order)
+                        return False
+                        
                     ## if delay hrs in operation
                     if next_operation.maxDelayHrs>0:
                         ### try assigning delay hrs
@@ -440,237 +479,209 @@ class ScheduleAssigner:
                 else:
                     ### Not assigned next opearation
                     remaining_all_operation_assignable = False
-                    self.restart_assigning_with_next_hour(order)
-                    # first_operation.day_st_end_assigned_list = []
-                    # next_operation.day_st_end_assigned_list = []
-                    # print(f"PREVIOUS trial of start day {first_operation.temp_assigned_st_day_index} and hr {first_operation.temp_assigned_st_hr_index} not feasible")
-                    # next_trial =  first_operation.temp_assigned_st_hr_index + 1
-                    # print(f"TRYING NEXT trial for start day {first_operation.temp_assigned_st_day_index} and hr {next_trial} ")
-                    # self.try_assigning_all_operations(order, trial_start_day_index= first_operation.temp_assigned_st_day_index, trial_start_hr=next_trial )
+                    # self.restart_assigning_with_next_hour(order)
+                    return False
+                    
 
 
 
-
-            print("All operations assignable :: ", remaining_all_operation_assignable)
-            f = open(self.output_file, 'a+',  newline="")
-            csvWriter = csv.writer(f)
-            header = ["Operation_name", "machine_name", "CycleTime(Hrs)", "MinDelay",	"MaxDelay", "Start_date", "start_time", "end_date", "end_time"]
-            csvWriter.writerow(header)
-            if remaining_all_operation_assignable==True:
-                for i, operation in enumerate(order.operationSeq):
-                    operation.freeze_operation_st_end_times(self.days_list)
-
-                    csvWriter.writerow([operation.id, operation.machineReq.name, operation.cycleTimeHrs, operation.minDelayHrs, 
-                        operation.maxDelayHrs, operation.operationStart_date, 
-                        operation.operationStart_time, operation.operationEnd_date, operation.operationEnd_time])
-
-                
-            else:
-                ## restart the operation
-                if first_operation.temp_assigned_st_day_index is not None:
-                    self.restart_assigning_with_next_hour(order)
-                    # print(f"PREVIOUS trial of start day {first_operation.temp_assigned_st_day_index} and hr {first_operation.temp_assigned_st_hr_index} not feasible")
-                    # next_trial =  first_operation.temp_assigned_st_hr_index + 1
-                    # print(f"TRYING NEXT trial for start day {first_operation.temp_assigned_st_day_index} and hr {next_trial} ")
-
-                    # self.try_assigning_all_operations(order, trial_start_day_index= first_operation.temp_assigned_st_day_index, trial_start_hr=next_trial )
-            
-            f.close()
-
-        return remaining_all_operation_assignable
+            print("All operations assignable :: ", first_operation_assigned_successfully and remaining_all_operation_assignable)
+           
+        return first_operation_assigned_successfully and remaining_all_operation_assignable
 
     @classmethod
-    def get_day_machine_sch_img(self, dayIndex, machineName):
+    def get_day_machine_sch_img(self, dayIndex, machineName):        
         day = ScheduleAssigner.days_list[dayIndex]
         return DaySlotMachine.daySchedules[day][machineName]
 
   
-class AssignerSingleOperation:
-    """Class i) to iterate over each hour and 
-        ii) place the operation image over day/days schedule image
-        iii) validate rules
-        iv) return the final, start_daytime, end_daytime, delayHours used"""
+# class AssignerSingleOperation:
+#     """Class i) to iterate over each hour and 
+#         ii) place the operation image over day/days schedule image
+#         iii) validate rules
+#         iv) return the final, start_daytime, end_daytime, delayHours used"""
 
-    def __init__(self, startDayIndex, stHrIndex, operationGrayImg, operationMachinName):
-        self.startDayIndex = startDayIndex
-        self.stHrIndex = stHrIndex
-        self.operationGrayImg = operationGrayImg
+#     def __init__(self, startDayIndex, stHrIndex, operationGrayImg, operationMachinName):
+#         self.startDayIndex = startDayIndex
+#         self.stHrIndex = stHrIndex
+#         self.operationGrayImg = operationGrayImg
         
-        self.operationMachinName = operationMachinName
+#         self.operationMachinName = operationMachinName
         
-        self.list_day_oper_crop_images = []
-        self.list_day_images = []
+#         self.list_day_oper_crop_images = []
+#         self.list_day_images = []
 
-    def get_operation_img_day_mask(self):
+#     def get_operation_img_day_mask(self):
         
 
 
-        list_day_oper_crop_images = []  ## List containing list of  [dayImg, corr.operation crop img]
-        width_op_img = self.operationGrayImg.shape[1]
-        current_day_index = self.startDayIndex 
+#         list_day_oper_crop_images = []  ## List containing list of  [dayImg, corr.operation crop img]
+#         width_op_img = self.operationGrayImg.shape[1]
+#         current_day_index = self.startDayIndex 
         
-        for i in range(10): # 10 days
-        # while True:
-            dayGrayImg, mask_allowable_work, mask_allowable_delay, mask_assigned_hrs = ScheduleAssigner.get_day_machine_sch_img(dayIndex=current_day_index, machineName=self.operationMachinName)
-            start_working_hr = self.get_starting_hr_operation_working(mask_allowable_work)
+#         for i in range(10): # 10 days
+            
+#             dayGrayImg, mask_allowable_work, mask_allowable_delay, mask_assigned_hrs = ScheduleAssigner.get_day_machine_sch_img(dayIndex=current_day_index, machineName=self.operationMachinName)
+#             start_working_hr = self.get_starting_hr_operation_working(mask_allowable_work)
 
-            if start_working_hr == -1:
-                ### Means no working hour available in that day
-                current_day_index+=1
-            else:
-                ### Try assigning the at start hr
-                remaining_operation_img = self.operationGrayImg
-                self.validate_and_crop_operation_for_next_day(remaining_operation_img, dayStartIndex=current_day_index, startHr=start_working_hr)
+#             if start_working_hr == -1:
+#                 ### Means no working hour available in that day
+#                 current_day_index+=1
+#             else:
+#                 ### Try assigning the at start hr
+#                 remaining_operation_img = self.operationGrayImg
+                
+#                 self.validate_and_crop_operation_for_next_day(remaining_operation_img, dayStartIndex=current_day_index, startHr=start_working_hr)
 
               
 
-            print("start_working hour", start_working_hr)
+#             print("start_working hour", start_working_hr)
 
 
-            # showImg('dayGrayImg',dayGrayImg)
-            # showImg('mask_allowable_work',mask_allowable_work)
-            # showImg('mask_allowable_delay',mask_allowable_delay)
-            # cv2.waitKey(-1)
-            print('sch')
+#             # showImg('dayGrayImg',dayGrayImg)
+#             # showImg('mask_allowable_work',mask_allowable_work)
+#             # showImg('mask_allowable_delay',mask_allowable_delay)
+#             # cv2.waitKey(-1)
+#             print('sch')
      
 
-    def get_starting_hr_operation_working(self, mask_allowable_work):
+#     def get_starting_hr_operation_working(self, mask_allowable_work):
 
-        if mask_allowable_work.size==0:
-            min_x = 1
-        else:
-            coordinates = np.argwhere(mask_allowable_work==255)
-            if coordinates.size==0:
-                min_x=-1
-                print("No whites found means no working hours available in the day")
-            else:
-                min_values = np.min(np.argwhere(mask_allowable_work==255), axis=0)
-                if len(min_values.shape) == 0:
-                    print("No whites found means no working hours available in the day")
-                    min_x = -1
-                else:    
-                    min_x = min_values[1]
-                    print('min start working hr ', min_x)
+#         if mask_allowable_work.size==0:
+#             min_x = 1
+#         else:
+#             coordinates = np.argwhere(mask_allowable_work==255)
+#             if coordinates.size==0:
+#                 min_x=-1
+#                 print("No whites found means no working hours available in the day")
+#             else:
+#                 min_values = np.min(np.argwhere(mask_allowable_work==255), axis=0)
+#                 if len(min_values.shape) == 0:
+#                     print("No whites found means no working hours available in the day")
+#                     min_x = -1
+#                 else:    
+#                     min_x = min_values[1]
+#                     print('min start working hr ', min_x)
 
-        return min_x
+#         return min_x
 
-    def validate_and_crop_operation_for_next_day(self, remaining_operation_gray_img, dayStartIndex, startHr):
-        """Function validate rule of assigning and returns operationAssigned, stHr, endHr, 
-            and Remaining cropped image for next day assignment"""
+#     def validate_and_crop_operation_for_next_day(self, remaining_operation_gray_img, dayStartIndex, startHr):
+#         """Function validate rule of assigning and returns operationAssigned, stHr, endHr, 
+#             and Remaining cropped image for next day assignment"""
 
-        dayGrayImg, mask_allowable_work, mask_allowable_delay, mask_assigned_hrs = ScheduleAssigner.get_day_machine_sch_img(dayIndex=dayStartIndex, 
-                            machineName=self.operationMachinName)
+#         dayGrayImg, mask_allowable_work, mask_allowable_delay, mask_assigned_hrs = ScheduleAssigner.get_day_machine_sch_img(dayIndex=dayStartIndex, 
+#                             machineName=self.operationMachinName)
         
         
-        mask_operation_work, mask_operation_delay = utils.get_operation_work_and_delay_masks(remaining_operation_gray_img)
+#         mask_operation_work, mask_operation_delay = utils.get_operation_work_and_delay_masks(remaining_operation_gray_img)
 
-        assigned_day_operation_work_mask = np.zeros_like(dayGrayImg)
-        assigned_day_operation_delay_mask = np.zeros_like(dayGrayImg)
-        width_operation_remaining = remaining_operation_gray_img.shape[1]
-        endHr = startHr + width_operation_remaining
+#         assigned_day_operation_work_mask = np.zeros_like(dayGrayImg)
+#         assigned_day_operation_delay_mask = np.zeros_like(dayGrayImg)
+#         width_operation_remaining = remaining_operation_gray_img.shape[1]
+#         endHr = startHr + width_operation_remaining
 
-        if endHr <= dayGrayImg.shape[1]:
-            assigned_day_operation_delay_mask[:,startHr:endHr] = mask_operation_delay
-            assigned_day_operation_work_mask[:,startHr:endHr] = mask_operation_work
+#         if endHr <= dayGrayImg.shape[1]:
+#             assigned_day_operation_delay_mask[:,startHr:endHr] = mask_operation_delay
+#             assigned_day_operation_work_mask[:,startHr:endHr] = mask_operation_work
 
-            stacked_delay_mask = np.vstack((mask_allowable_delay,assigned_day_operation_delay_mask))
-            stacked_work_mask = np.vstack((mask_allowable_work,assigned_day_operation_work_mask))
+#             stacked_delay_mask = np.vstack((mask_allowable_delay,assigned_day_operation_delay_mask))
+#             stacked_work_mask = np.vstack((mask_allowable_work,assigned_day_operation_work_mask))
             
-            work_subtracted_mask = assigned_day_operation_work_mask - mask_allowable_work
-            isOverlapPerfect, cropEndHr = self.check_if_color_on_gray(work_subtracted_mask, assigned_day_operation_work_mask)
-            if isOverlapPerfect==True:
-                #if color fits perfectly, start putting delay after that
-                EndHrOperation_working = cropEndHr
-                next_day_crop_gray = None
-                return isOverlapPerfect, dayStartIndex, startHr, endHr, next_day_crop_gray
+#             work_subtracted_mask = assigned_day_operation_work_mask - mask_allowable_work
+#             isOverlapPerfect, cropEndHr = self.check_if_color_on_gray(work_subtracted_mask, assigned_day_operation_work_mask)
+#             if isOverlapPerfect==True:
+#                 #if color fits perfectly, start putting delay after that
+#                 EndHrOperation_working = cropEndHr
+#                 next_day_crop_gray = None
+#                 return isOverlapPerfect, dayStartIndex, startHr, endHr, next_day_crop_gray
                 
-            else:
-                next_day_crop_mask_total = assigned_day_operation_work_mask[:, cropEndHr:]
-                hrs_remaining_for_next_day = np.sum(next_day_crop_mask_total==255)
-                next_day_crop_gray = remaining_operation_gray_img[:,width_operation_remaining-hrs_remaining_for_next_day:]
-                return isOverlapPerfect, dayStartIndex, startHr, cropEndHr, next_day_crop_gray
+#             else:
+#                 next_day_crop_mask_total = assigned_day_operation_work_mask[:, cropEndHr:]
+#                 hrs_remaining_for_next_day = np.sum(next_day_crop_mask_total==255)
+#                 next_day_crop_gray = remaining_operation_gray_img[:,width_operation_remaining-hrs_remaining_for_next_day:]
+#                 return isOverlapPerfect, dayStartIndex, startHr, cropEndHr, next_day_crop_gray
 
-    def iterate_operation_working_mask(self):
-
-
-        """            """
-        ### RETURN VALUES
-        assinged_work_operation_day_st_index = None
-        assinged_work_operation_day_st_hr = None
-        assinged_work_operation_day_end_index = None
-        assinged_work_operation_day_end_hr = None
+#     def iterate_operation_working_mask(self):
 
 
-        current_day_index = self.startDayIndex
-        dayGrayImg, mask_allowable_work, mask_allowable_delay = ScheduleAssigner.get_day_machine_sch_img(dayIndex=current_day_index, machineName=self.operationMachinName)
-        start_working_hr = self.get_starting_hr_operation_working(mask_allowable_work)
-        remaining_operation_img = self.operationGrayImg
+#         """            """
+#         ### RETURN VALUES
+#         assinged_work_operation_day_st_index = None
+#         assinged_work_operation_day_st_hr = None
+#         assinged_work_operation_day_end_index = None
+#         assinged_work_operation_day_end_hr = None
 
-        if start_working_hr == -1:
-            ### Means no working hour available in that day
-            current_day_index+=1
-            ### Reset values
-            remaining_operation_img = self.operationGrayImg
-            start_working_hr = self.get_starting_hr_operation_working(mask_allowable_work)
+
+#         current_day_index = self.startDayIndex
+#         dayGrayImg, mask_allowable_work, mask_allowable_delay = ScheduleAssigner.get_day_machine_sch_img(dayIndex=current_day_index, machineName=self.operationMachinName)
+#         start_working_hr = self.get_starting_hr_operation_working(mask_allowable_work)
+#         remaining_operation_img = self.operationGrayImg
+
+#         if start_working_hr == -1:
+#             ### Means no working hour available in that day
+#             current_day_index+=1
+#             ### Reset values
+#             remaining_operation_img = self.operationGrayImg
+#             start_working_hr = self.get_starting_hr_operation_working(mask_allowable_work)
         
-        else:
-            ### Try assigning the at start hr
-            day_operation_working_indices = []            
-            isOverlapPerfect, dayEndIndex, crop_op_startHr, cropEndHr, next_day_crop_gray = self.validate_and_crop_operation_for_next_day(remaining_operation_img, dayStartIndex=current_day_index, startHr=start_working_hr)
-            day_operation_working_indices.append(dayEndIndex)
-            while isOverlapPerfect==True:
-                current_day_index = dayEndIndex+1
-                isOverlapPerfect, dayEndIndex, crop_op_startHr, cropEndHr, next_day_crop_gray = self.validate_and_crop_operation_for_next_day(next_day_crop_gray, 
+#         else:
+#             ### Try assigning the at start hr
+#             day_operation_working_indices = []            
+#             isOverlapPerfect, dayEndIndex, crop_op_startHr, cropEndHr, next_day_crop_gray = self.validate_and_crop_operation_for_next_day(remaining_operation_img, dayStartIndex=current_day_index, startHr=start_working_hr)
+#             day_operation_working_indices.append(dayEndIndex)
+#             while isOverlapPerfect==True:
+#                 current_day_index = dayEndIndex+1
+#                 isOverlapPerfect, dayEndIndex, crop_op_startHr, cropEndHr, next_day_crop_gray = self.validate_and_crop_operation_for_next_day(next_day_crop_gray, 
 
-                        dayStartIndex=current_day_index, startHr=start_working_hr)
+#                         dayStartIndex=current_day_index, startHr=start_working_hr)
 
-    def stretch_min_max_delay_working_mask(self):
-        """"""
-        pass
+#     def stretch_min_max_delay_working_mask(self):
+#         """"""
+#         pass
 
-    def check_if_color_on_gray(self,work_subtracted_mask, assigned_day_operation_work_mask):
-        """check if operation_work_mask overlapps on day_work_mask, if extra left, return end hr to crop
-        return endHr (int) for next day cropping of operation else None"""
+#     def check_if_color_on_gray(self,work_subtracted_mask, assigned_day_operation_work_mask):
+#         """check if operation_work_mask overlapps on day_work_mask, if extra left, return end hr to crop
+#         return endHr (int) for next day cropping of operation else None"""
 
-        whiteCount = np.sum(work_subtracted_mask==255)
-        if whiteCount==0:
-            ## work mask is perfectly overlapped
-            cropEndHr = np.min(np.argwhere(assigned_day_operation_work_mask==255), axis=1)[1]
-            isOverlapPerfect = True    
-        else:
-            cropEndHr = np.min(np.argwhere(work_subtracted_mask==255), axis=1)[1]
-            # color is overlapping gray
-            isOverlapPerfect = False
-
-
-        return isOverlapPerfect, cropEndHr
+#         whiteCount = np.sum(work_subtracted_mask==255)
+#         if whiteCount==0:
+#             ## work mask is perfectly overlapped
+#             cropEndHr = np.min(np.argwhere(assigned_day_operation_work_mask==255), axis=1)[1]
+#             isOverlapPerfect = True    
+#         else:
+#             cropEndHr = np.min(np.argwhere(work_subtracted_mask==255), axis=1)[1]
+#             # color is overlapping gray
+#             isOverlapPerfect = False
 
 
+#         return isOverlapPerfect, cropEndHr
 
 
-class Validator:
-    """Class to validate all order assigning rules"""
-    def __init__(self, dayScheduleImg, assigningOrderImg, assigningWorkingHrMask, delayHrsMask, st_hr):
-        self.assigningWorkingHrMask = assigningWorkingHrMask
-        self.delayHrsMask = delayHrsMask
-        self.assigningOrderImg = assigningOrderImg
-        self.dayScheduleImg = dayScheduleImg
 
-    def check_rule(self):
-        """Rules
-        1. Gray_order can overlap NightNon working hours as well as production hours
-        2. Color_order can overlap only on working and non assigned hours of day
-        3.     
-        """
+
+# class Validator:
+#     """Class to validate all order assigning rules"""
+#     def __init__(self, dayScheduleImg, assigningOrderImg, assigningWorkingHrMask, delayHrsMask, st_hr):
+#         self.assigningWorkingHrMask = assigningWorkingHrMask
+#         self.delayHrsMask = delayHrsMask
+#         self.assigningOrderImg = assigningOrderImg
+#         self.dayScheduleImg = dayScheduleImg
+
+#     def check_rule(self):
+#         """Rules
+#         1. Gray_order can overlap NightNon working hours as well as production hours
+#         2. Color_order can overlap only on working and non assigned hours of day
+#         3.     
+#         """
 
         
 
-    def check_if_other_operation_assigned_in_between(self):
-        """"""
-        pass
+#     def check_if_other_operation_assigned_in_between(self):
+#         """"""
+#         pass
 
-    def check_if_color_on_gray(self):
-        """"""
-        pass
+#     def check_if_color_on_gray(self):
+#         """"""
+#         pass
         
 
