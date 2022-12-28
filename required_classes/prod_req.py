@@ -546,19 +546,7 @@ class CycleAssignerValidator:
 
         return validation_result
 
-
-
-
-
-
-
-
-
-
-
-
-
-        
+       
 
 
 
@@ -629,36 +617,7 @@ class Order_or_job:
         else:
             return None
     
-    def getOrderOperationImageList(self):
-        
-        
-        
-        for i, operation in enumerate(self.operationSeq):
-            imgOp = operation.create_image()
-            self.orderImageListSeq.append(imgOp)
-        
-       
-        widowName = f"Operation {self.id}"
-        
-        return self.orderImageListSeq
-
-    def getTotalOrderImage(self):
-        if len(self.orderImageListSeq)==0:
-            self.getOrderOperationImageList()
-        
-        imageHt = len(self.operationSeq)
-        imageWd = self.totalMaxTime
-        self.orderImg = np.zeros((imageHt, imageWd, 3))
-        
-        st = 0
-        for i, img in enumerate(self.orderImageListSeq):
-            operationImgWidth = img.shape[1]
-            end = st + operationImgWidth
-            self.orderImg[i, st:end] = img
-
-            st = end
-
-        return self.orderImg 
+    
 
     def __str__(self):
         return f"Order name {self.id} assignedstDay {self.assigned_st_dayTime}"
@@ -666,21 +625,6 @@ class Order_or_job:
     def save_order(self):
         self.orderList.append(self)
 
-
-    def assign_order(self, assigned_values_list):
-        """assign all operations the start and end time
-        param list of list of assigning values ex [[stDate, stHr, endDate, endHr], [stDate, stHr, endDate, endHr]]"""
-        
-        for i, operation in enumerate(self.operationSeq):
-            # start_day_operation = start_day_first_operation
-            stDate, stHr, endDate, endHr = assigned_values_list[i]
-            operation.operationStart_date =stDate
-            operation.operationStart_time = stHr
-            operation.operationEnd_date = endDate
-            operation.operationEnd_time = endHr
-        
-        self.isScheduleAssigned = True
-        self.isInfeasibleForProduction=False
     
     def print_order_assigned_status(self):
         if self.isInfeasibleForProduction:

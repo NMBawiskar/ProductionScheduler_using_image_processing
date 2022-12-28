@@ -4,9 +4,10 @@ from required_classes.scheduler_new import ScheduleAssigner
 from required_classes.prod_req import *
 from required_classes.machine_sch import *
 import traceback
+from utils2 import get_output_csv_file_path
 
 # excel_path = r'input_data\NewData_121822.xlsx'
-excel_path = r'input_data\Requirements_Data_edited _view.xlsx'
+excel_path = r'C:\Users\bawis\TRIMITY_3D_TECH\FiverrProjects\Image_processing\ProductionScheduler_using_image_processing\input_data\Requirements_Data_edited.xlsx'
 
 inputDataObj= InputDataGenerator(excelFilePath=excel_path)
 inputDataObj.createAllMachineObjects()
@@ -22,11 +23,16 @@ inputDataObj.createAllDaySlots()
 
 dayList = list(DaySlotMachine.daySchedules.keys())
 scheduleAssigner = ScheduleAssigner()
+
+outputCsvFilePath = get_output_csv_file_path(excel_path)
+
+print("outputCsvFilePath",outputCsvFilePath)
+scheduleAssigner.output_file = outputCsvFilePath
 ScheduleAssigner.days_list = dayList
 DaySlotMachine.days_list = dayList
 
 
-
+"""
 
 for orderToProcess in Order_or_job.orderList:
     try:
@@ -38,3 +44,4 @@ for orderToProcess in Order_or_job.orderList:
     except Exception as e:
         print(traceback.print_exc())
 
+"""

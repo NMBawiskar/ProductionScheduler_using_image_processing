@@ -76,3 +76,5 @@ def plot_list_images(list_images, list_titles):
         plt.tick_params(axis='y',left = False, labelleft = False, )
         sub.set_xticks(np.arange(0, 24, 1))
         sub.set_ylabel(list_titles[i], rotation=0, labelpad=40)
+
+    plt.show()

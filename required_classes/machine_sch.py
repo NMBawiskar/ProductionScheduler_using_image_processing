@@ -58,24 +58,6 @@ class DaySlotMachine:
         self.mask_delay_overlap_allowable = None
         self.mask_assigned_hrs = None
         self.display_img_block = None
-     
-
-    def assignMachineHrs_filled(self, listHrsBooked:List[int]):
-        """Function takes in list of hrs ex. [10,11,12,13,14] adds them to self.hrs_filled_up"""
-        for hr in listHrsBooked: 
-            self.daySlotArray[0,hr] = ASSIGNED
-        self.get_gray_day_slot_img()
-
-    def calculate_hrs_available(self):
-        self.hrs_available = []
-        for hr in range(1,25):
-            if hr not in self.hrs_filled_up and hr not in self.hrs_not_working:
-                self.hrs_available.append(hr)
-
-    def add_non_working_hrs(self, stHr, endHr):
-        for hr in range(stHr, endHr):
-            self.daySlotArray[0,hr] = NOT_AVAILABLE
-        self.get_gray_day_slot_img()
 
     def setInitialDayAvailability(self, stHr, endHr):
         self.dayStHr = stHr
@@ -147,9 +129,6 @@ class DaySlotMachine:
 
         return self.availableHrs
 
-    def plot_img(self):
-        widowName = f"daySchedule {self.machine.name} 1/1/22"
-        
 
     def get_day_working_img(self):
         if self.img_working_hrs is None:
@@ -157,33 +136,6 @@ class DaySlotMachine:
         
         return self.img_working_hrs
 
-    def get_available_working_slots(self):
-        self.get_available_hrs_assigned_hrs_count()
-        ## relative hrs 
-        relativeHrList = [hr - self.dayStHr for hr in self.hourList_available]
-        index_to_split_at =  []
-        hr_list_crop = []
-        for i, hrAvailable in enumerate(relativeHrList):
-            if i>0:
-                if hrAvailable - relativeHrList[i-1] == 1:
-                    pass
-                else:
-                    index_to_split_at.append(i)
-
-        if len(index_to_split_at)>0:
-            ## more than one available block to assign
-            for j, index in enumerate(index_to_split_at):
-                if j==0:
-                    hr_list_crop.append(relativeHrList[0:index])
-
-                if j>0:                    
-                    hr_list_crop.append(relativeHrList[index_to_split_at[j-1]:index_to_split_at[j]])
-            hr_list_crop.append(relativeHrList[index_to_split_at[1]:]) 
-
-        else:
-            hr_list_crop = [relativeHrList]
-
-        return hr_list_crop
 
     @classmethod
     def assignMachineHrs_for_order(self, dict_machine_name_data_assignment):
