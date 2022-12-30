@@ -616,8 +616,7 @@ class Order_or_job:
             return Machine.dict_machine_name[machineName]
         else:
             return None
-    
-    
+
 
     def __str__(self):
         return f"Order name {self.id} assignedstDay {self.assigned_st_dayTime}"

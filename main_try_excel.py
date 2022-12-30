@@ -32,7 +32,7 @@ ScheduleAssigner.days_list = dayList
 DaySlotMachine.days_list = dayList
 
 
-"""
+
 
 for orderToProcess in Order_or_job.orderList:
     try:
@@ -44,4 +44,3 @@ for orderToProcess in Order_or_job.orderList:
     except Exception as e:
         print(traceback.print_exc())
 
-"""

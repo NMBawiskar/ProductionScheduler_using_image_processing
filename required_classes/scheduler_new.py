@@ -6,6 +6,7 @@ import cv2
 import numpy as np
 import csv
 import utils2
+import os
 
 
 GRAY_GRAY = 50
@@ -20,7 +21,7 @@ BLACK_PLUS_BLUE_GRAY = 29
 
 class ScheduleAssigner:
     days_list = []
-
+    outputImgDir = "orderImages"
     def __init__(self):
         self.current_weekImg = None
         self.current_weekNo = 0
@@ -34,7 +35,15 @@ class ScheduleAssigner:
         self.increment = 1
         self.output_file = 'output.csv'
         self.written_header = False
-     
+        
+        
+
+    def create_dir(self):
+        try:
+            os.mkdir(self.outputImgDir)
+        except Exception as e:
+            pass
+
     
     def assign_order_operation_wise(self, order):
         """Main starter function to try assign all operation of an order"""
@@ -67,7 +76,7 @@ class ScheduleAssigner:
 
             DaySlotMachine.assignMachineHrs_for_order(dict_machine_name_data_assignment=dict_machine_name_data_assignment)
 
-
+            
             day_index_machine_list = []
             for machineName, list_data_to_assign in dict_machine_name_data_assignment.items():
                 for data_to_assign in list_data_to_assign:
@@ -96,16 +105,39 @@ class ScheduleAssigner:
             imgList = []
             title_list = []
             for day, machineName in dayList_machineName_to_display:
-                imgDaySlotAssigned = DaySlotMachine.get_display_day_machine_color_block(dayIndex, machineName)
+                imgDaySlotAssigned = DaySlotMachine.get_display_day_machine_color_block(day, machineName)
                 imgList.append(imgDaySlotAssigned)
                 title_list.append(f"{self.days_list[day]}__{machineName}")
                     
-            utils2.plot_list_images(imgList, title_list)
+            # utils2.plot_list_images(imgList, title_list)
+            imgListOrder = []
+            title_list_order = []
+            machineList_unique = []
+            for machineName in machineList:
+                if machineName not in machineList_unique:
+                    machineList_unique.append(machineName)
+            ############## NEw display of order image #############
+            for day in range(minDay, maxDay+1,1):
+                for machineName in machineList_unique:
+                    imgDaySlotAssigned = DaySlotMachine.get_display_day_machine_color_block(day, machineName)
+                    imgListOrder.append(imgDaySlotAssigned)
+                    title_list_order.append(f"{self.days_list[day]}__{machineName}")
+
+            plotSavePath = os.path.join(self.outputImgDir, f"{order.id}.png")
+            utils2.plot_list_images(imgListOrder, title_list_order, plotSavePath)   
+
+
+                
+
+
+
+
             
         else:
             ## Mark order as not assignable
             order.isInfeasibleForProduction = True
-            
+
+        
         self.save_result_to_csv_file(order)
       
     def validate_if_prev_op_cycle_ends_at_day_end(self, prev_op_assignent_list, curr_op_assignment_list, prev_op_max_delay_hrs):

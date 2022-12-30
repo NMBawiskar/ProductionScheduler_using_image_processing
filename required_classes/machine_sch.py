@@ -160,7 +160,7 @@ class DaySlotMachine:
                 DaySlotMachine.daySchedules[day][machineName].display_img_block[:,stHrIndex:endHrIndex] = color_assignment
                 all_order_images.append(DaySlotMachine.daySchedules[day][machineName].display_img_block)
                 title_list.append(f"{day}_{machineName}_{stHrIndex}__{endHrIndex}__{cycle_or_delay}")
-        utils2.plot_list_images(all_order_images,title_list)
+        # utils2.plot_list_images(all_order_images,title_list)
             
 
     def render_display_img(self):
@@ -175,7 +175,7 @@ class DaySlotMachine:
         day = DaySlotMachine.days_list[date_index]
         daySCh = DaySlotMachine.daySchedules[day][machineName]
        
-        display_img = daySCh.display_img_block
+        # display_img = daySCh.display_img_block
         # utils.showImg(f'DayBlockDisplay_{day}',display_img)
         # cv2.waitKey(-1)
-        return display_img
+        return DaySlotMachine.daySchedules[day][machineName].display_img_block

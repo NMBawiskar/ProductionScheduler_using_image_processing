@@ -5,7 +5,7 @@ import os
 
 
 
-def plot_list_images(list_images, list_titles):
+def plot_list_images(list_images, list_titles, plotSavePath):
     fig = plt.figure(figsize=(10,24))
     for i in range(len(list_images)):
         sub =plt.subplot(len(list_images),1,i+1)
@@ -15,7 +15,8 @@ def plot_list_images(list_images, list_titles):
         sub.set_xticks(np.arange(0, 24, 1))
         sub.set_ylabel(list_titles[i], rotation=0, labelpad=40)
     
-    plt.show()
+    # plt.show()
+    plt.savefig(plotSavePath)
 
 
 def get_output_csv_file_path(inputExcelFilePath):
