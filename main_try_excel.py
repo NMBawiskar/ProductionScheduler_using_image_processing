@@ -7,7 +7,7 @@ import traceback
 from utils2 import get_output_csv_file_path
 
 # excel_path = r'input_data\NewData_121822.xlsx'
-excel_path = r'C:\Users\bawis\TRIMITY_3D_TECH\FiverrProjects\Image_processing\ProductionScheduler_using_image_processing\input_data\Requirements_Data_edited.xlsx'
+excel_path = r'input_data\NewData_121822 - New.xlsx'
 
 inputDataObj= InputDataGenerator(excelFilePath=excel_path)
 inputDataObj.createAllMachineObjects()

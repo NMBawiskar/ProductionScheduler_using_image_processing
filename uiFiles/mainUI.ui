@@ -32,7 +32,7 @@
        <x>1040</x>
        <y>50</y>
        <width>151</width>
-       <height>31</height>
+       <height>41</height>
       </rect>
      </property>
      <property name="font">
@@ -82,7 +82,7 @@ border:2px solid rgb(64, 109, 255);</string>
    <widget class="QPushButton" name="btn_start">
     <property name="geometry">
      <rect>
-      <x>1080</x>
+      <x>1070</x>
       <y>220</y>
       <width>151</width>
       <height>41</height>
@@ -140,11 +140,40 @@ border:2px solid rgb(64, 109, 255);</string>
    <widget class="QTableWidget" name="tableWidgetResult">
     <property name="geometry">
      <rect>
-      <x>40</x>
+      <x>30</x>
       <y>300</y>
-      <width>1191</width>
+      <width>1231</width>
       <height>491</height>
      </rect>
+    </property>
+   </widget>
+   <widget class="QPushButton" name="btn_reset">
+    <property name="geometry">
+     <rect>
+      <x>860</x>
+      <y>220</y>
+      <width>151</width>
+      <height>41</height>
+     </rect>
+    </property>
+    <property name="font">
+     <font>
+      <family>Segoe UI Semibold</family>
+      <pointsize>10</pointsize>
+      <weight>7</weight>
+      <italic>false</italic>
+      <bold>false</bold>
+     </font>
+    </property>
+    <property name="styleSheet">
+     <string notr="true">background-color:rgb(216, 229, 253);
+font: 63 10pt &quot;Segoe UI Semibold&quot;;
+color: rgb(64, 109, 255);
+border-radius:10;
+border:2px solid rgb(64, 109, 255);</string>
+    </property>
+    <property name="text">
+     <string>Reset</string>
     </property>
    </widget>
   </widget>

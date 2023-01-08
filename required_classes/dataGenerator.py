@@ -86,7 +86,14 @@ class InputDataGenerator:
             if machineObj is not None:
                 daySlotMachine = DaySlotMachine(day=day,machine=machineObj)
                 if stTime is not None:
-                    daySlotMachine.setInitialDayAvailability(stTime.hour, endTime.hour)
+                    if stTime.date()==endTime.date():
+
+                        daySlotMachine.setInitialDayAvailability(stTime.hour, endTime.hour)
+                    else:
+                        
+                        daySlotMachine.setInitialDayAvailability(stTime.hour, 24)
+
+
                 else:
                     daySlotMachine.assign_weekend_day()
     

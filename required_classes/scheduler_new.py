@@ -7,6 +7,7 @@ import numpy as np
 import csv
 import utils2
 import os
+import shutil
 
 
 GRAY_GRAY = 50
@@ -22,6 +23,7 @@ BLACK_PLUS_BLUE_GRAY = 29
 class ScheduleAssigner:
     days_list = []
     outputImgDir = "orderImages"
+    
     def __init__(self):
         self.current_weekImg = None
         self.current_weekNo = 0
@@ -35,10 +37,13 @@ class ScheduleAssigner:
         self.increment = 1
         self.output_file = 'output.csv'
         self.written_header = False
-        
-        
+        self.create_dir()
 
     def create_dir(self):
+        try:
+            shutil.rmtree(self.outputImgDir)
+        except:
+            pass
         try:
             os.mkdir(self.outputImgDir)
         except Exception as e:
@@ -125,10 +130,6 @@ class ScheduleAssigner:
 
             plotSavePath = os.path.join(self.outputImgDir, f"{order.id}.png")
             utils2.plot_list_images(imgListOrder, title_list_order, plotSavePath)   
-
-
-                
-
 
 
 
@@ -234,18 +235,22 @@ class ScheduleAssigner:
         return result_all_operation_assigned
 
     def __write_header_to_csv_file(self):
-        f = open(self.output_file, 'a+',  newline="")
-        csvWriter = csv.writer(f)
-        header = ["Operation_name", "machine_name", "CycleTime(Hrs)", "MinDelay",	"MaxDelay", "Start_date", "start_time", "end_date", "end_time"]
-        csvWriter.writerow(header)
-        f.close()
-
+        try:
+            f = open(self.output_file, 'a+',  newline="")
+            csvWriter = csv.writer(f)
+            header = ["Operation_name", "machine_name", "CycleTime(Hrs)", "MinDelay",	"MaxDelay", "Start_date", "start_time", "end_date", "end_time"]
+            csvWriter.writerow(header)
+            f.close()
+        except Exception as e:
+            print("Error in writing header to csv file",e)
 
     def save_result_to_csv_file(self, order):
         if self.written_header==False:
+            print("writing header  to csv file")
+
             self.__write_header_to_csv_file()
             self.written_header = True
-
+        print("saving result to csv file")
 
         f = open(self.output_file, 'a+',  newline="")
         csvWriter = csv.writer(f)
@@ -264,6 +269,7 @@ class ScheduleAssigner:
 
 
         f.close()
+        print("saved result to csv file...")
 
 
     def try_assigning_all_operations(self, order, trial_start_hr=0, trial_start_day_index=0):

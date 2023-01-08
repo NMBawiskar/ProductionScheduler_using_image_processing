@@ -1,4 +1,4 @@
 Operation_name,machine_name,CycleTime(Hrs),MinDelay,MaxDelay,Start_date,start_time,end_date,end_time
 CO1_OP10,M1,1,1,10,01-03-22,8,01-03-22,10
 CO1_OP20,M2,2,3,10,01-03-22,10,01-03-22,15
-CO1_OP30,M3,5,3,20,01-03-22,15,01-04-22,15
+CO1_OP30,M3,5,3,20,01-03-22,15,01-03-22,23

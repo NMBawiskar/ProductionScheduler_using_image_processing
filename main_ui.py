@@ -15,6 +15,7 @@ from utils2 import get_output_csv_file_path
 import csv
 from required_classes.detailWindowCl import DetailWindow
 from PyQt5.QtWidgets import * 
+import shutil
 
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self):
@@ -28,6 +29,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.btn_browse.clicked.connect(self.selectFile)
         self.btn_start.clicked.connect(self.start_assigning)
         self.btn_details.clicked.connect(self.toDetailsWindow)
+        self.btn_reset.clicked.connect(self.reset_all)
 
         self.outputImgDir = "orderImages"
         self.orderList = []
@@ -52,53 +54,79 @@ class MainWindow(QtWidgets.QMainWindow):
         # csvFilePath = r'input_data\assigned_Requirements_Data_edited.csv'
         
         dataRows = []
-        with open(filePathCsv, 'r') as f:
-            csvReader = csv.reader(f)
-            header = next(csvReader)
-            print("header",header)
-            dataRows.append(header)
-            for row in csvReader:
-                print('row',row)
-                dataRows.append(row)
-          
+        if os.path.exists(filePathCsv):
+            with open(filePathCsv, 'r') as f:
+                csvReader = csv.reader(f)
+                header = next(csvReader)
+                print("header",header)
+                dataRows.append(header)
+                for row in csvReader:
+                    print('row',row)
+                    dataRows.append(row)
+            
+            
+            print("dataRows",dataRows)
+
+            self.tableWidgetResult.setColumnCount(9)
+            self.tableWidgetResult.setRowCount(len(dataRows))
+            for rowNo, dataRow in enumerate(dataRows):
+                for colNo, text_ in enumerate(dataRow):
+                    item_ = QtWidgets.QTableWidgetItem(text_)
+                    self.tableWidgetResult.setItem(rowNo, colNo, item_)
+
+                    self.tableWidgetResult.horizontalHeader().setStretchLastSection(True)
+                    self.tableWidgetResult.horizontalHeader().setSectionResizeMode(
+                        QHeaderView.Stretch)
+        else:
+            print("No CSV file found at ",filePathCsv)
+
+    def reset_all(self):
+        print('reset button')
+        self.tableWidgetResult.clear()
         
-        print("dataRows",dataRows)
-
-        self.tableWidgetResult.setColumnCount(9)
-        self.tableWidgetResult.setRowCount(len(dataRows))
-        for rowNo, dataRow in enumerate(dataRows):
-            for colNo, text_ in enumerate(dataRow):
-                item_ = QtWidgets.QTableWidgetItem(text_)
-                self.tableWidgetResult.setItem(rowNo, colNo, item_)
-
-                self.tableWidgetResult.horizontalHeader().setStretchLastSection(True)
-                self.tableWidgetResult.horizontalHeader().setSectionResizeMode(
-                    QHeaderView.Stretch)
-
-
+        self.inputDataObj= None
+        self.orderList = None
+        Order_or_job.orderList = []
+        DaySlotMachine.daySchedules.clear()
+        DaySlotMachine.days_list = []
+        Machine.dict_machine_name= {}
+        CycleAssignerValidator.validator_list = []
+        CycleAssignerValidator.list_mask_assigned= []
+        self.scheduleAssigner = None
+        try:
+            shutil.rmtree(ScheduleAssigner.outputImgDir)
+        except:
+            pass
+        try:
+            os.mkdir(ScheduleAssigner.outputImgDir)
+        except:
+            pass
+       
     def start_assigning(self):
+        self.reset_all()
         if os.path.exists(self.input_excel_path):
-            inputDataObj= InputDataGenerator(excelFilePath=self.input_excel_path)
-            inputDataObj.createAllMachineObjects()
+            self.inputDataObj= InputDataGenerator(excelFilePath=self.input_excel_path)
+            self.inputDataObj.createAllMachineObjects()
 
-            daysList = inputDataObj.df_machine_sch['StartDate'].tolist()
-            inputDataObj.createAllOrders()
+            # daysList = self.inputDataObj.df_machine_sch['StartDate'].tolist()
+            self.inputDataObj.createAllOrders()
 
             print(len(Order_or_job.orderList))
             self.orderList = [obj.id for obj  in Order_or_job.orderList]
 
-            inputDataObj.createAllDaySlots()
+            self.inputDataObj.createAllDaySlots()
 
 
             dayList = list(DaySlotMachine.daySchedules.keys())
-            scheduleAssigner = ScheduleAssigner()
+            self.scheduleAssigner = ScheduleAssigner()
 
             outputCsvFilePath = get_output_csv_file_path(self.input_excel_path)
-            scheduleAssigner.output_file = outputCsvFilePath
+            self.scheduleAssigner.output_file = outputCsvFilePath
             try:
-                os.remove(scheduleAssigner.output_file)  
+                os.remove(self.scheduleAssigner.output_file)
             except:
                 pass
+
             ScheduleAssigner.days_list = dayList
             ScheduleAssigner.outputImgDir = self.outputImgDir
 
@@ -106,27 +134,27 @@ class MainWindow(QtWidgets.QMainWindow):
 
             for orderToProcess in Order_or_job.orderList:
                 try:
-                    scheduleAssigner.assign_order_operation_wise(order = orderToProcess)
+                    self.scheduleAssigner.assign_order_operation_wise(order = orderToProcess)
                 
                 except Exception as e:
                     print(traceback.print_exc())
 
-            self.show_table_details(scheduleAssigner.output_file)
+            self.show_table_details(self.scheduleAssigner.output_file)
             ### Add result to table widget
-
+            """
             self.model = QtGui.QStandardItemModel(self)
-
-            self.tableView = QtWidgets.QTableView(self)
-            self.tableView.horizontalHeader().setStretchLastSection(True)
+            self.model.removeRows(0, self.model.rowCount())
+            # self.tableView = QtWidgets.QTableView(self)
+            # self.tableView.horizontalHeader().setStretchLastSection(True)
 
             with open(outputCsvFilePath, "r") as fileInput:
                 for row in csv.reader(fileInput):    
                     items = [QtGui.QStandardItem(field) for field in row]
-                    print(items)
+                    # print(items)
                     self.model.appendRow(items)
 
             self.tableView.setModel(self.model)
-            
+            """
 
 
 
@@ -161,7 +189,7 @@ if __name__ == '__main__':
     app = QtWidgets.QApplication(sys.argv)
     w = MainWindow()
     w.show()
-    w.setWindowTitle("Registration window")
+    w.setWindowTitle("Production Scheduler")
     # w.setWindowIcon(QtGui.QIcon(r'resources/QuicSolv-Fevicon.png'))
     sys.exit(app.exec())
     

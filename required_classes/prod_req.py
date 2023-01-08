@@ -500,7 +500,12 @@ class CycleAssignerValidator:
 
         # mask_work_day_sche = CycleAssignerValidator.list_mask_assigned[-1]
         # mask_not_allowable_work = cv2.bitwise_not(mask_allowable_work)
-        if mask_allowable_work[0, end_hr_assigned + 1]==0:
+        #### EDIT here for 24 hrs
+        # if mask_allowable_work[0, end_hr_assigned + 1]==0:
+        if end_hr_assigned==24:
+            return True
+            
+        if mask_allowable_work[0, end_hr_assigned]==0:
             ## Mean cycle is ending at day end...
             
             delay_hrs_to_stretch = 0
