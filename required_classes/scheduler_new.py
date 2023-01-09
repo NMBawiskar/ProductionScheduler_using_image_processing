@@ -184,7 +184,10 @@ class ScheduleAssigner:
                         hrs_to_accomodate = 24 - end_hr_prev_cycle
                         list_delay_to_add = [day_index, end_hr_prev_cycle, 24, 1]
                     elif day_index==curr_cycle_day_index:
-                        hrs_to_accomodate = start_hr_curr_cycle - 1
+                        if start_hr_curr_cycle>0:
+                            hrs_to_accomodate = start_hr_curr_cycle - 1
+                        else:
+                            hrs_to_accomodate = 0
                         list_delay_to_add = [day_index, 0, start_hr_curr_cycle, 1]
                     else:
                         hrs_to_accomodate = 24
@@ -192,7 +195,7 @@ class ScheduleAssigner:
                     hrs_to_elapse+= hrs_to_accomodate 
                     delay_stretched_new_list.append(list_delay_to_add)           
 
-            if hrs_to_elapse >1:
+            if hrs_to_elapse >0:
                 ### Check if prev_operation_max_delay can accomodate this
                 if hrs_to_elapse<= prev_op_max_delay_hrs:
                     ## OK can go further

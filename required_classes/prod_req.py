@@ -103,7 +103,7 @@ class Operation:
         """will assing temporary start day and hr and 
         return endCycleDay, endCycleHr for DelayAssignment"""
         # validate_if dayStartIndex
-        if isFirstOrder:
+        if isFirstOrder==True:
             CycleAssignerValidator.validator_list= []
             CycleAssignerValidator.list_mask_assigned = []
 
@@ -432,6 +432,8 @@ class CycleAssignerValidator:
                 self.trialStHr+= self.increment
                 # self.try_assigning()
             else:
+                CycleAssignerValidator.validator_list = []
+                CycleAssignerValidator.list_mask_assigned = []
                 return False
 
 
