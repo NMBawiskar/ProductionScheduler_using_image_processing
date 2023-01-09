@@ -112,10 +112,14 @@ class Operation:
             print("got dayStartIndex as None ???")
             return None, None
             
+        if trialStHr==24:
+            trialStHr = 0
+            dayStartIndex +=1
 
         endCycleDayIndex, endCycleHrIndex = None,None
         self.temp_assigned_st_day_index = dayStartIndex
         self.temp_assigned_st_hr_index = trialStHr
+
         
         cycleAssigner = CycleAssignerValidator(self.cycleTimeHrs, trialStDayIndex=dayStartIndex, trialStHr=trialStHr, machineName=self.machineReq.name,
           operation_max_delay_hrs = self.maxDelayHrs)

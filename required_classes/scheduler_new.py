@@ -166,8 +166,9 @@ class ScheduleAssigner:
                 curr_cycle_day_index, start_hr_curr_cycle = day_index, st_hr
                 break
         
-
-        if prev_cycle_day_index and  end_hr_prev_cycle and curr_cycle_day_index and start_hr_curr_cycle:
+        if prev_cycle_day_index is not None and end_hr_prev_cycle is not None and \
+            curr_cycle_day_index is not None and start_hr_curr_cycle is not None: 
+        # if prev_cycle_day_index and  end_hr_prev_cycle and curr_cycle_day_index and start_hr_curr_cycle:
             hrs_to_elapse = 0
             delay_stretched_new_list = []
             if prev_cycle_day_index == curr_cycle_day_index:
