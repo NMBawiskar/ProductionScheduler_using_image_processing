@@ -104,57 +104,60 @@ class MainWindow(QtWidgets.QMainWindow):
        
     def start_assigning(self):
         self.reset_all()
-        if os.path.exists(self.input_excel_path):
-            self.inputDataObj= InputDataGenerator(excelFilePath=self.input_excel_path)
-            self.inputDataObj.createAllMachineObjects()
+        try:
+            if os.path.exists(self.input_excel_path):
+                self.inputDataObj= InputDataGenerator(excelFilePath=self.input_excel_path)
+                self.inputDataObj.createAllMachineObjects()
 
-            # daysList = self.inputDataObj.df_machine_sch['StartDate'].tolist()
-            self.inputDataObj.createAllOrders()
+                # daysList = self.inputDataObj.df_machine_sch['StartDate'].tolist()
+                self.inputDataObj.createAllOrders()
 
-            print(len(Order_or_job.orderList))
-            self.orderList = [obj.id for obj  in Order_or_job.orderList]
+                print(len(Order_or_job.orderList))
+                self.orderList = [obj.id for obj  in Order_or_job.orderList]
 
-            self.inputDataObj.createAllDaySlots()
+                self.inputDataObj.createAllDaySlots()
 
 
-            dayList = list(DaySlotMachine.daySchedules.keys())
-            self.scheduleAssigner = ScheduleAssigner()
+                dayList = list(DaySlotMachine.daySchedules.keys())
+                self.scheduleAssigner = ScheduleAssigner()
 
-            outputCsvFilePath = get_output_csv_file_path(self.input_excel_path)
-            self.scheduleAssigner.output_file = outputCsvFilePath
-            try:
-                os.remove(self.scheduleAssigner.output_file)
-            except:
-                pass
-
-            ScheduleAssigner.days_list = dayList
-            ScheduleAssigner.outputImgDir = self.outputImgDir
-
-            DaySlotMachine.days_list = dayList
-
-            for orderToProcess in Order_or_job.orderList:
+                outputCsvFilePath = get_output_csv_file_path(self.input_excel_path)
+                self.scheduleAssigner.output_file = outputCsvFilePath
                 try:
-                    self.scheduleAssigner.assign_order_operation_wise(order = orderToProcess)
-                
-                except Exception as e:
-                    print(traceback.print_exc())
+                    os.remove(self.scheduleAssigner.output_file)
+                except:
+                    pass
 
-            self.show_table_details(self.scheduleAssigner.output_file)
-            ### Add result to table widget
-            """
-            self.model = QtGui.QStandardItemModel(self)
-            self.model.removeRows(0, self.model.rowCount())
-            # self.tableView = QtWidgets.QTableView(self)
-            # self.tableView.horizontalHeader().setStretchLastSection(True)
+                ScheduleAssigner.days_list = dayList
+                ScheduleAssigner.outputImgDir = self.outputImgDir
 
-            with open(outputCsvFilePath, "r") as fileInput:
-                for row in csv.reader(fileInput):    
-                    items = [QtGui.QStandardItem(field) for field in row]
-                    # print(items)
-                    self.model.appendRow(items)
+                DaySlotMachine.days_list = dayList
 
-            self.tableView.setModel(self.model)
-            """
+                for orderToProcess in Order_or_job.orderList:
+                    try:
+                        self.scheduleAssigner.assign_order_operation_wise(order = orderToProcess)
+                    
+                    except Exception as e:
+                        print(traceback.print_exc())
+
+                self.show_table_details(self.scheduleAssigner.output_file)
+                ### Add result to table widget
+                """
+                self.model = QtGui.QStandardItemModel(self)
+                self.model.removeRows(0, self.model.rowCount())
+                # self.tableView = QtWidgets.QTableView(self)
+                # self.tableView.horizontalHeader().setStretchLastSection(True)
+
+                with open(outputCsvFilePath, "r") as fileInput:
+                    for row in csv.reader(fileInput):    
+                        items = [QtGui.QStandardItem(field) for field in row]
+                        # print(items)
+                        self.model.appendRow(items)
+
+                self.tableView.setModel(self.model)
+                """
+        except Exception as e:
+            print("error",e)
 
 
 

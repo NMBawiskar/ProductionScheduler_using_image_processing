@@ -322,11 +322,12 @@ class ScheduleAssigner:
         if first_operation_assigned_successfully ==True:
             first_operation.day_st_end_assigned_list.extend(first_operation.delay_detail_list)
             print("FIRST operation temporary assignment details :")
-            print(f"""Operation ID {first_operation.id} : Machine {first_operation.machineReq.name} 
-            START {ScheduleAssigner.days_list[first_operation.temp_assigned_st_day_index]} 
-            - {first_operation.temp_assigned_st_hr_index} hrs, END {ScheduleAssigner.days_list[first_operation.temp_assigned_end_day_index]} 
-            - {first_operation.temp_assigned_end_hr_index} hrs
-            """)
+            if first_operation.temp_assigned_end_day_index is not None:
+                print(f"""Operation ID {first_operation.id} : Machine {first_operation.machineReq.name} 
+                START {ScheduleAssigner.days_list[first_operation.temp_assigned_st_day_index]} 
+                - {first_operation.temp_assigned_st_hr_index} hrs, END {ScheduleAssigner.days_list[first_operation.temp_assigned_end_day_index]} 
+                - {first_operation.temp_assigned_end_hr_index} hrs
+                """)
         #### once done first operation
         # next_operations are directly assigned and checked for validations
         if first_operation_assigned_successfully==False:
